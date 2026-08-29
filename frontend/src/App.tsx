@@ -8,6 +8,7 @@ import { CaseResultView } from './views/CaseResultView';
 import { ReviewerQueueView } from './views/ReviewerQueueView';
 import { CaseDetailReviewView } from './views/CaseDetailReviewView';
 import { SimulationDashboardView } from './views/SimulationDashboardView';
+import { BenchmarkAblationView } from './views/BenchmarkAblationView';
 import { ReportPreviewModal } from './views/ReportPreviewModal';
 import { CaseUploadResponse, CaseResult } from './types/api';
 import { Language } from './i18n/translations';
@@ -20,11 +21,12 @@ type ViewMode =
   | 'case_result'
   | 'reviewer_queue'
   | 'case_detail_review'
-  | 'simulation_dashboard';
+  | 'simulation_dashboard'
+  | 'benchmarks';
 
 export const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('en');
-  const [currentRole, setCurrentRole] = useState<'field' | 'reviewer' | 'admin' | null>(null);
+  const [currentRole, setCurrentRole] = useState<'field' | 'reviewer' | 'admin' | 'benchmarks' | null>(null);
   const [view, setView] = useState<ViewMode>('role_select');
 
   // State across flow
@@ -34,7 +36,7 @@ export const App: React.FC = () => {
   const [selectedCaseIdForReview, setSelectedCaseIdForReview] = useState<string | null>(null);
   const [reportModalCaseId, setReportModalCaseId] = useState<string | null>(null);
 
-  const handleSelectRole = (role: 'field' | 'reviewer' | 'admin' | null) => {
+  const handleSelectRole = (role: 'field' | 'reviewer' | 'admin' | 'benchmarks' | null) => {
     setCurrentRole(role);
     if (!role) {
       setView('role_select');
@@ -44,6 +46,8 @@ export const App: React.FC = () => {
       setView('reviewer_queue');
     } else if (role === 'admin') {
       setView('simulation_dashboard');
+    } else if (role === 'benchmarks') {
+      setView('benchmarks');
     }
   };
 
@@ -144,6 +148,12 @@ export const App: React.FC = () => {
           <SimulationDashboardView
             lang={lang}
           />
+        )}
+
+        {view === 'benchmarks' && (
+          <div className="py-8 px-4 sm:px-6 lg:px-8">
+            <BenchmarkAblationView />
+          </div>
         )}
       </main>
 

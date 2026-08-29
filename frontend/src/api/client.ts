@@ -4,10 +4,30 @@ import {
   CaseResult, 
   CaseListItem, 
   SimulationParams, 
-  SimulationResult 
+  SimulationResult,
+  CompetitiveTableResponse,
+  AblationResponse
 } from '../types/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+
+export const getBackendOrigin = (): string => {
+  try {
+    const url = new URL(API_BASE_URL);
+    return url.origin;
+  } catch {
+    return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000';
+  }
+};
+
+export const resolveImageUrl = (path?: string): string => {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+    return path;
+  }
+  const origin = getBackendOrigin();
+  return `${origin}${path.startsWith('/') ? '' : '/'}${path}`;
+};
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -81,6 +101,17 @@ export const api = {
   // 8. Health Check
   getHealth: async () => {
     const response = await apiClient.get('/health');
+    return response.data;
+  },
+
+  // 9. Competitive Benchmarks & Ablation Studies
+  getCompetitiveTable: async (): Promise<CompetitiveTableResponse> => {
+    const response = await apiClient.get<CompetitiveTableResponse>('/benchmarks/competitive-table');
+    return response.data;
+  },
+
+  getAblationResults: async (): Promise<AblationResponse> => {
+    const response = await apiClient.get<AblationResponse>('/benchmarks/ablation-results');
     return response.data;
   }
 };

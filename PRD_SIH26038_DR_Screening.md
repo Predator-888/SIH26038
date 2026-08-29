@@ -1,6 +1,6 @@
 # PRD: Explainable AI for Diabetic Retinopathy Screening in Rural India
 **SIH26038 · Sponsor: MathWorks · Theme: MedTech / BioTech / HealthTech**
-**Companion documents:** `TECH_STACK_SIH26038.md` · `UI_UX_SPEC_SIH26038.md`
+**Companion documents:** `TECH_STACK_SIH26038.md` · `UI_UX_SPEC_SIH26038.md` · `COMPETITIVE_LANDSCAPE_SIH26038.md`
 
 ---
 
@@ -226,15 +226,18 @@ dr-screening/
 
 ---
 
-## 12. Competitive Differentiation — Don't Just Build the Spec
+## 12. Competitive Differentiation — Verified Against Real Prior Art
 
-Every competent team at SIH will build roughly the 5 modules the PS literally describes. Building them correctly is table stakes, not a winning edge. Here's where you can actually differentiate — pick one or two, don't try all of them:
+**See `COMPETITIVE_LANDSCAPE_SIH26038.md` for full sourcing.** The short version: don't claim novelty for things that already exist commercially or in published research — a jury member can and will check. Verified existing systems include IDx-DR/LumineticsCore (FDA-cleared, 87.2%/90.7%), EyeArt (FDA-cleared, 96%/88–94%, *already ships a proprietary real-time image quality feedback module*), and — most relevant to this PS — Google/Verily's **ARDA**, deployed at Aravind Eye Hospital across 45 Tamil Nadu sites, screening 600,000+ patients at a real-world **97.0% sensitivity / 96.4% specificity**. Grad-CAM for DR and uncertainty-based referral are both established academic research areas with dozens of papers each.
 
-1. **Offline-first, on-device inference.** Most DR-AI research assumes reliable cloud connectivity. Rural India often doesn't have it. Quantize the grading model (TensorFlow Lite / ONNX Runtime Mobile) to run locally on a low-cost Android tablet at the point of care, with async sync when connectivity returns. This directly answers the PS's own "bandwidth constraints" language — most teams will treat that as a Simulink parameter only; you can treat it as a design constraint the whole architecture responds to.
-2. **Active capture guidance, not just reject/retake.** Instead of a binary quality pass/fail after the fact, give the field worker real-time on-screen guidance while framing the shot (blur/exposure/centering feedback), cutting recapture cycles. This is a visible, demo-friendly upgrade over the PS's literal "reject and ask to recapture" spec.
-3. **Confidence-based triage, not just referable/not-referable.** Split output into three bands — confidently normal, confidently referable, and uncertain-needs-priority-review — and route only the uncertain/positive cases to the ophthalmologist queue. This isn't just a UX nicety: feed this triage rate directly into your Simulink model as the actual reviewer-queue input, so your workflow simulation reflects a smarter system, not just a faster one. This ties two "required" modules together in a way most teams won't think to do.
-4. **Lesion-level structured explanations, not just a heatmap.** The PS explicitly asks for "lesion-level evidence correlated with clinical criteria" — most teams will stop at a Grad-CAM overlay and call it done. Go further: output a structured summary ("3 microaneurysms, superior temporal quadrant; 1 hemorrhage, inferior nasal quadrant") generated from your segmentation module's outputs, displayed alongside the heatmap. This is explicitly asked for in the spec and is exactly the kind of detail a MathWorks judge will notice is missing from other teams' work.
-5. **An honest ablation study.** The PS explicitly requires showing "the integrated pipeline outperforms any single technique approach." Almost no student team actually runs this comparison — they claim it in a slide. Run and show a real table: grading accuracy/kappa with vs. without quality gating, with vs. without segmentation-informed features. This single deliverable signals the "clinical validation rigor" the PS calls out by name, and it's cheap to produce if you've built the pipeline modularly (see Section 9's repo structure).
+Here's what's left standing as genuinely defensible, ranked by how rare it actually is:
+
+1. **The Simulink-tied triage-to-resource loop.** No system found — commercial or academic — feeds an AI's own confidence/triage output directly into a workflow-capacity simulation. IDx-DR, EyeArt, and ARDA are closed diagnostic tools; academic uncertainty papers stop at the referral decision. Route your confidence bands (confidently normal / confidently referable / uncertain-needs-review) directly into the Simulink reviewer-queue model as the actual input variable — this is your strongest, most citable claim, and it's also the literal graded MathWorks deliverable.
+2. **Structured lesion-level text evidence correlated with Grad-CAM**, not just a heatmap. The PS explicitly asks for this ("lesion-level evidence correlated with clinical criteria"); the published Grad-CAM-for-DR literature almost universally stops at the visual overlay. Output a structured summary ("3 microaneurysms, superior temporal quadrant; 1 hemorrhage, inferior nasal quadrant") generated from your segmentation module.
+3. **Being open and inspectable where every real commercial competitor is closed.** IDx-DR, EyeArt, and ARDA all give zero public insight into why they decided what they decided. State this contrast explicitly and honestly — it's true, sourced, and doesn't require you to claim you out-detect them.
+4. **An honest ablation study** — integrated pipeline vs. single-technique — which the PS explicitly requires and which almost no student team actually executes (they assert it in a slide instead). Cheap to produce if the pipeline is modular (see Section 9's repo structure), and it directly demonstrates the "clinical validation rigor" the PS calls out by name.
+
+**Don't lead the pitch with:** image quality gating (Eyenuk already sells this), rural/offline AI screening in India (ARDA and Eye Mitra already do this at scale), or "AI that knows when not to diagnose" as a headline claim (this is literally the subject of an active academic subfield — calibration-based referral). Use the refined pitch language and jury Q&A prep in `COMPETITIVE_LANDSCAPE_SIH26038.md` §4 instead.
 
 ## 13. Demo Script Alignment (Judging Checklist)
 

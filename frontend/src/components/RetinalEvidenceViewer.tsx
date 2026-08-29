@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lesion } from '../types/api';
+import { resolveImageUrl } from '../api/client';
 import { 
   Layers, 
   ZoomIn, 
@@ -206,7 +207,7 @@ export const RetinalEvidenceViewer: React.FC<RetinalEvidenceViewerProps> = ({
         >
           {/* Base Fundus Image with filters */}
           <img
-            src={imageUrl}
+            src={resolveImageUrl(imageUrl)}
             alt="Fundus Scan"
             className="w-full h-full object-cover transition-all"
             style={{
@@ -217,7 +218,7 @@ export const RetinalEvidenceViewer: React.FC<RetinalEvidenceViewerProps> = ({
           {/* Grad-CAM Saliency Heatmap Layer */}
           {gradcamOverlayUrl && showGradcam && (
             <img
-              src={gradcamOverlayUrl}
+              src={resolveImageUrl(gradcamOverlayUrl)}
               alt="Grad-CAM Saliency"
               className="absolute inset-0 w-full h-full object-cover mix-blend-screen transition-opacity duration-200 pointer-events-none"
               style={{ opacity: opacity }}

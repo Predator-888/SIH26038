@@ -7,13 +7,14 @@ import {
   Stethoscope, 
   BarChart2, 
   Activity,
-  Server
+  Server,
+  Award
 } from 'lucide-react';
 import { Language, translations } from '../i18n/translations';
 
 interface NavbarProps {
-  currentRole: 'field' | 'reviewer' | 'admin' | null;
-  onSelectRole: (role: 'field' | 'reviewer' | 'admin' | null) => void;
+  currentRole: 'field' | 'reviewer' | 'admin' | 'benchmarks' | null;
+  onSelectRole: (role: 'field' | 'reviewer' | 'admin' | 'benchmarks' | null) => void;
   lang: Language;
   onToggleLang: (lang: Language) => void;
 }
@@ -53,7 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentRole, onSelectRole, lang,
           <nav className="flex items-center gap-1.5 bg-clinical-100 p-1.5 rounded-2xl border border-clinical-300">
             <button
               onClick={() => onSelectRole('field')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${
                 currentRole === 'field'
                   ? 'bg-clinical-900 text-white shadow-md'
                   : 'bg-white text-clinical-700 hover:text-clinical-950 hover:bg-clinical-50'
@@ -65,26 +66,38 @@ export const Navbar: React.FC<NavbarProps> = ({ currentRole, onSelectRole, lang,
 
             <button
               onClick={() => onSelectRole('reviewer')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${
                 currentRole === 'reviewer'
                   ? 'bg-clinical-900 text-white shadow-md'
                   : 'bg-white text-clinical-700 hover:text-clinical-950 hover:bg-clinical-50'
               }`}
             >
               <Stethoscope className={`w-3.5 h-3.5 ${currentRole === 'reviewer' ? 'text-medical-glow' : 'text-medical'}`} />
-              <span>{lang === 'en' ? 'Clinician PACS' : 'चिकित्सक वर्कस्टेशन'}</span>
+              <span>{lang === 'en' ? 'Clinician PACS' : 'चिकित्सक'}</span>
             </button>
 
             <button
               onClick={() => onSelectRole('admin')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${
                 currentRole === 'admin'
                   ? 'bg-clinical-900 text-white shadow-md'
                   : 'bg-white text-clinical-700 hover:text-clinical-950 hover:bg-clinical-50'
               }`}
             >
               <BarChart2 className={`w-3.5 h-3.5 ${currentRole === 'admin' ? 'text-medical-glow' : 'text-medical'}`} />
-              <span>{lang === 'en' ? 'District Analytics' : 'जिला एनालिटिक्स'}</span>
+              <span>{lang === 'en' ? 'District Analytics' : 'एनालिटिक्स'}</span>
+            </button>
+
+            <button
+              onClick={() => onSelectRole('benchmarks')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${
+                currentRole === 'benchmarks'
+                  ? 'bg-medical text-white shadow-md'
+                  : 'bg-white text-clinical-700 hover:text-clinical-950 hover:bg-clinical-50'
+              }`}
+            >
+              <Award className={`w-3.5 h-3.5 ${currentRole === 'benchmarks' ? 'text-white' : 'text-medical'}`} />
+              <span>{lang === 'en' ? 'SOTA & Ablation' : 'मानक व शोध'}</span>
             </button>
           </nav>
         )}

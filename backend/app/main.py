@@ -7,12 +7,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 
 from backend.app.config import settings
 from backend.app.database import init_db
-from backend.app.routers import cases, analysis, reports, simulation, health
+from backend.app.routers import cases, analysis, reports, simulation, health, benchmarks
 
 
 @asynccontextmanager
@@ -50,6 +50,7 @@ app.include_router(analysis.router, prefix=api_v1_prefix)
 app.include_router(reports.router, prefix=api_v1_prefix)
 app.include_router(simulation.router, prefix=api_v1_prefix)
 app.include_router(health.router, prefix=api_v1_prefix)
+app.include_router(benchmarks.router, prefix=api_v1_prefix)
 
 
 # 4. Standardized Error Handling per Tech Stack §5.9
@@ -67,13 +68,42 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
+# 5. Frontend SPA Support (serves built React UI if available)
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+frontend_assets = os.path.join(frontend_dist, "assets")
+
+if os.path.exists(frontend_assets):
+    app.mount("/assets", StaticFiles(directory=frontend_assets), name="frontend-assets")
+
+
 @app.get("/")
 def root():
+    index_file = os.path.join(frontend_dist, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
     return {
         "system": "SIH26038 Explainable DR Screening Platform",
         "docs": "/docs",
         "health": f"{api_v1_prefix}/health"
     }
+
+
+@app.get("/{full_path:path}")
+async def serve_spa_fallback(full_path: str):
+    # If file exists in frontend dist (e.g. favicon, robots.txt, vite.svg)
+    candidate_file = os.path.join(frontend_dist, full_path)
+    if os.path.exists(candidate_file) and os.path.isfile(candidate_file):
+        return FileResponse(candidate_file)
+    
+    # SPA client-side routes fallback to index.html
+    index_file = os.path.join(frontend_dist, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    
+    return JSONResponse(
+        status_code=404,
+        content={"error": {"code": "NOT_FOUND", "message": f"Path /{full_path} not found."}}
+    )
 
 
 if __name__ == "__main__":

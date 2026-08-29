@@ -9,7 +9,8 @@ import {
   Wifi, 
   Cpu, 
   ShieldCheck,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react';
 
 interface SimulationVisualizerProps {
@@ -175,7 +176,7 @@ export const SimulationVisualizer: React.FC<SimulationVisualizerProps> = ({ resu
       </div>
 
       {/* Actionable Staffing Recommendation Box */}
-      <div className="bg-medical-light border-2 border-medical/40 p-5 rounded-2xl shadow-subtle">
+      <div className="bg-medical-light border-2 border-medical/40 p-5 rounded-2xl shadow-subtle space-y-3">
         <div className="flex items-start gap-3.5">
           <div className="p-2 rounded-xl bg-medical text-white flex-shrink-0 mt-0.5 shadow-md">
             <Activity className="w-5 h-5" />
@@ -188,6 +189,17 @@ export const SimulationVisualizer: React.FC<SimulationVisualizerProps> = ({ resu
               {result.recommendation}
             </p>
           </div>
+        </div>
+
+        {/* Closed-Loop AI Triage Link Banner */}
+        <div className="pt-3 border-t border-medical/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-clinical-800">
+          <span className="flex items-center gap-1.5 font-bold text-medical">
+            <Sparkles className="w-3.5 h-3.5 text-medical" />
+            Closed-Loop AI Triage Feed:
+          </span>
+          <span className="font-mono bg-white/80 px-2.5 py-1 rounded-lg border border-medical/30 text-clinical-900">
+            ~70% Auto-Triage (Normal/Referral) · ~30% Priority Clinician Review Queue
+          </span>
         </div>
       </div>
 

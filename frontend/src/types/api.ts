@@ -88,3 +88,63 @@ export interface SimulationResult {
   bottleneck: 'bandwidth' | 'processing' | 'review_capacity' | 'none';
   recommendation: string;
 }
+
+export interface CompetitiveSystem {
+  name: string;
+  type: string;
+  validation_scale: string;
+  sensitivity: string;
+  specificity: string;
+  metric_notes: string;
+  image_quality_check: string;
+  explainability: string;
+  lesion_breakdown: string;
+  uncertainty_triage: string;
+  offline_rural_ready: string;
+  workflow_simulation: string;
+  license_status: string;
+}
+
+export interface CompetitiveTableResponse {
+  title: string;
+  source_notes: string;
+  systems: CompetitiveSystem[];
+  defensible_innovations: Array<{ title: string; description: string }>;
+}
+
+export interface AblationVariant {
+  name: string;
+  qwk?: number;
+  accuracy?: number;
+  referable_sensitivity?: number;
+  referable_specificity?: number;
+  ece?: number;
+  brier_score?: number;
+  overconfidence_rate?: string;
+  triage_reliability?: string;
+  explainability_score?: string;
+  notes?: string;
+}
+
+export interface AblationExperiment {
+  title: string;
+  description: string;
+  variants?: AblationVariant[];
+  degradation_curve?: Array<{
+    noise_level: string;
+    unenhanced_sensitivity: number;
+    enhanced_pipeline_sensitivity: number;
+    quality_gate_action?: string;
+  }>;
+}
+
+export interface AblationResponse {
+  summary: string;
+  experiments: {
+    preprocessing: AblationExperiment;
+    feature_fusion: AblationExperiment;
+    calibration: AblationExperiment;
+    robustness: AblationExperiment;
+  };
+}
+
