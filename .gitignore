@@ -12,15 +12,30 @@ dist/
 dist-ssr/
 *.local
 
-# Data & Checkpoints
+# Data & Checkpoints (Heavy Datasets & Model Weights)
+Dataset/
+dataset/
+Datasets/
+datasets/
+Datasests/
+datasests/
+data/
+Data/
 uploads/
 static/generated/
 ml/checkpoints/*.pt
 ml/checkpoints/*.pth
 ml/checkpoints/*.onnx
-data/raw/
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.rar
+*.tif
+*.tiff
 
-# IDE
+# IDE & OS
 .vscode/
 .idea/
 .DS_Store
+*.log

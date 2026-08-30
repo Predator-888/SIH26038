@@ -104,44 +104,72 @@ def load_dataset_from_csv(
     """
     df = pd.read_csv(csv_path)
     
-    # Auto-detect column names if not exact match
-    cols_lower = {col.lower(): col for col in df.columns}
+    # Auto-detect column names across APTOS, IDRiD, Messidor-2
+    cols_clean = {str(c).lower().replace(" ", "").replace("_", ""): c for c in df.columns}
     
-    id_key = cols_lower.get(id_col.lower(), cols_lower.get("id_code", cols_lower.get("image", cols_lower.get("filename", df.columns[0]))))
-    label_key = cols_lower.get(label_col.lower(), cols_lower.get("label", cols_lower.get("grade", cols_lower.get("dr_grade", df.columns[1]))))
+    id_candidates = ["imageid", "idcode", "imagename", "image", "filename", "file", "id"]
+    label_candidates = ["diagnosis", "retinopathygrade", "adjudicateddrgrade", "drgrade", "grade", "label", "target"]
+    
+    id_key = None
+    for cand in id_candidates:
+        if cand in cols_clean:
+            id_key = cols_clean[cand]
+            break
+    if id_key is None:
+        id_key = df.columns[0]
+        
+    label_key = None
+    for cand in label_candidates:
+        if cand in cols_clean:
+            label_key = cols_clean[cand]
+            break
+    if label_key is None and len(df.columns) > 1:
+        label_key = df.columns[1]
 
     image_paths = []
     labels = []
 
     for _, row in df.iterrows():
         name = str(row[id_key]).strip()
-        if not (name.endswith(".png") or name.endswith(".jpg") or name.endswith(".jpeg")):
-            name = f"{name}{ext}"
+        base_name = os.path.splitext(name)[0]
         
-        # Candidate search paths (root, train_images, images, test_images)
+        # Candidate search paths (root, train_images, images, test_images, a. Training Set, etc.)
         candidate_dirs = [
             images_dir,
             os.path.join(images_dir, "train_images"),
             os.path.join(images_dir, "images"),
+            os.path.join(images_dir, "IMAGES"),
+            os.path.join(images_dir, "a. Training Set"),
+            os.path.join(images_dir, "b. Testing Set"),
             os.path.join(images_dir, "test_images")
         ]
         
         full_path = None
+        extensions = [".png", ".jpg", ".jpeg", ".tif", ".tiff"]
+        
         for cdir in candidate_dirs:
+            # 1. Direct path check
             p = os.path.join(cdir, name)
             if os.path.exists(p):
                 full_path = p
                 break
-            # Try alternate .jpg / .png extension
-            alt_ext = ".jpg" if name.endswith(".png") else ".png"
-            p_alt = os.path.join(cdir, f"{os.path.splitext(name)[0]}{alt_ext}")
-            if os.path.exists(p_alt):
-                full_path = p_alt
+            # 2. Try candidate extensions
+            for ext_opt in extensions:
+                p_alt = os.path.join(cdir, f"{base_name}{ext_opt}")
+                if os.path.exists(p_alt):
+                    full_path = p_alt
+                    break
+            if full_path:
                 break
 
-        if full_path and os.path.exists(full_path):
-            image_paths.append(full_path)
-            labels.append(int(row[label_key]))
+        if full_path and os.path.exists(full_path) and label_key in df.columns:
+            try:
+                val = row[label_key]
+                if pd.notna(val):
+                    labels.append(int(val))
+                    image_paths.append(full_path)
+            except (ValueError, TypeError):
+                continue
 
     print(f"Loaded {len(image_paths)} valid samples from {csv_path}")
     return image_paths, labels
