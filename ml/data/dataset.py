@@ -118,14 +118,28 @@ def load_dataset_from_csv(
         if not (name.endswith(".png") or name.endswith(".jpg") or name.endswith(".jpeg")):
             name = f"{name}{ext}"
         
-        full_path = os.path.join(images_dir, name)
-        if not os.path.exists(full_path):
-            # Try alternate extension
-            alt_path = os.path.join(images_dir, f"{os.path.splitext(name)[0]}.jpg")
-            if os.path.exists(alt_path):
-                full_path = alt_path
+        # Candidate search paths (root, train_images, images, test_images)
+        candidate_dirs = [
+            images_dir,
+            os.path.join(images_dir, "train_images"),
+            os.path.join(images_dir, "images"),
+            os.path.join(images_dir, "test_images")
+        ]
+        
+        full_path = None
+        for cdir in candidate_dirs:
+            p = os.path.join(cdir, name)
+            if os.path.exists(p):
+                full_path = p
+                break
+            # Try alternate .jpg / .png extension
+            alt_ext = ".jpg" if name.endswith(".png") else ".png"
+            p_alt = os.path.join(cdir, f"{os.path.splitext(name)[0]}{alt_ext}")
+            if os.path.exists(p_alt):
+                full_path = p_alt
+                break
 
-        if os.path.exists(full_path):
+        if full_path and os.path.exists(full_path):
             image_paths.append(full_path)
             labels.append(int(row[label_key]))
 
