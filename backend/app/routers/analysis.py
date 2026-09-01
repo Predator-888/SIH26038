@@ -34,10 +34,10 @@ def trigger_analysis(
         raise HTTPException(status_code=404, detail={"code": "CASE_NOT_FOUND", "message": "Case not found."})
 
     if case.status == "quality_rejected":
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "QUALITY_REJECTED", "message": "Cannot analyze an image that failed quality assessment."}
-        )
+        # Clinician diagnostic override
+        case.status = "override_analyzing"
+        session.add(case)
+        session.commit()
 
     # Run synchronously or dispatch to background task
     # For instant responsive feel in prototype, execute immediately

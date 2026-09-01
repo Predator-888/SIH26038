@@ -15,12 +15,12 @@ from typing import Dict, Any, List, Tuple
 class ImageQualityAssessment:
     def __init__(
         self,
-        quality_threshold: float = 0.60,
-        min_laplacian_var: float = 45.0,
-        min_mean_brightness: float = 35.0,
-        max_mean_brightness: float = 210.0,
-        max_glare_ratio: float = 0.08,
-        min_fov_ratio: float = 0.45
+        quality_threshold: float = 0.55,
+        min_laplacian_var: float = 12.0,
+        min_mean_brightness: float = 25.0,
+        max_mean_brightness: float = 220.0,
+        max_glare_ratio: float = 0.12,
+        min_fov_ratio: float = 0.40
     ):
         self.quality_threshold = quality_threshold
         self.min_laplacian_var = min_laplacian_var
@@ -33,19 +33,24 @@ class ImageQualityAssessment:
         """
         Calculates focus sharpness using Laplacian variance restricted to the retinal area.
         """
-        # Focus on the active retinal region only
         retina_pixels = gray_image[mask > 0]
         if len(retina_pixels) == 0:
             return 0.0, False
 
-        laplacian = cv2.Laplacian(gray_image, cv2.CV_64F)
-        laplacian_retina = laplacian[mask > 0]
-        variance = float(laplacian_retina.var())
+        # Resize to standard scale for consistent Laplacian variance calculation
+        h, w = gray_image.shape[:2]
+        std_scale = 512.0 / max(h, w)
+        scaled_gray = cv2.resize(gray_image, (int(w * std_scale), int(h * std_scale)), interpolation=cv2.INTER_AREA)
+        scaled_mask = cv2.resize(mask, (int(w * std_scale), int(h * std_scale)), interpolation=cv2.INTER_NEAREST)
 
-        # Normalize score non-linearly to 0.0 - 1.0 (sigmoid-like scaling around 80.0)
-        focus_score = min(1.0, variance / 120.0)
+        laplacian = cv2.Laplacian(scaled_gray, cv2.CV_64F)
+        laplacian_retina = laplacian[scaled_mask > 0]
+        variance = float(laplacian_retina.var()) if len(laplacian_retina) > 0 else 0.0
+
+        # Non-linear sigmoid normalization centered around typical retinal vessel sharpness
+        focus_score = float(np.clip(1.0 / (1.0 + np.exp(-(variance - 14.0) / 6.0)), 0.05, 0.99))
         is_sharp = variance >= self.min_laplacian_var
-        return focus_score, is_sharp
+        return round(focus_score, 2), is_sharp
 
     def assess_illumination(self, bgr_image: np.ndarray, mask: np.ndarray) -> Tuple[float, List[str]]:
         """

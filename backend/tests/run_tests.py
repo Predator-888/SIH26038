@@ -3,10 +3,14 @@ Direct test execution script for SIH26038 ML Pipeline and Services.
 """
 
 import sys
+import os
+import tempfile
 import numpy as np
 import cv2
-import tempfile
-import os
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from backend.app.schemas.simulation_schemas import SimulationRequest
 from backend.app.services.simulation_service import simulation_service
