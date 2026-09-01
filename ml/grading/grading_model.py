@@ -86,22 +86,19 @@ class DRGradingModel:
 
     def predict(self, processed_image: np.ndarray, detected_lesions: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """
-        Legacy predictor wrapper.
+        Evaluates retinal image through deep learning or clinical lesion segmentation fusion.
         """
-        if detected_lesions is not None:
-            return self.predict_from_findings(detected_lesions)
+        if detected_lesions is None:
+            try:
+                from ml.segmentation.unet_vessels import vessel_segmentor
+                from ml.segmentation.unet_lesions import lesion_segmentor
+                vessel_mask = vessel_segmentor.segment_vessels(processed_image)
+                optic_disc = vessel_segmentor.locate_optic_disc(processed_image)
+                detected_lesions = lesion_segmentor.extract_all_lesions(processed_image, vessel_mask, optic_disc)
+            except Exception:
+                detected_lesions = []
 
-        # Direct analysis if lesions not passed
-        # Evaluate variance and salient contrast
-        g = processed_image[:, :, 1]
-        std_g = np.std(g)
-        
-        if std_g < 25.0:
-            # Smooth normal retina
-            return self.predict_from_findings([])
-        else:
-            # Fallback estimation
-            return self.predict_from_findings([{"type": "microaneurysm", "bbox": [0.3, 0.3, 0.03, 0.03], "confidence": 0.8}])
+        return self.predict_from_findings(detected_lesions)
 
 
 # Singleton instance
