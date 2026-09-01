@@ -9,6 +9,12 @@ Includes:
 
 import os
 import sys
+
+# Ensure repository root is on sys.path when script is executed directly
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import argparse
 import time
 import json
@@ -159,16 +165,33 @@ def main():
     print(f"Total samples: {len(image_paths)} | Train: {len(train_paths)} | Val: {len(val_paths)}")
     print("Class distribution in Train:", {i: train_labels.count(i) for i in range(5)})
 
+    # Detect compute device
+    device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+    print(f"Training on device: {device}")
+    if device.type == "cuda":
+        print(f"  • GPU Model: {torch.cuda.get_device_name(0)}")
+        print(f"  • Total VRAM: {torch.cuda.get_device_properties(0).total_memory / (1024**3):.2f} GB")
+        torch.backends.cudnn.benchmark = True
+
     train_dataset = DRFundusDataset(train_paths, train_labels, is_training=True)
     val_dataset = DRFundusDataset(val_paths, val_labels, is_training=False)
 
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=2)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=2)
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_size=args.batch_size, 
+        shuffle=True, 
+        num_workers=2, 
+        pin_memory=(device.type == "cuda")
+    )
+    val_loader = DataLoader(
+        val_dataset, 
+        batch_size=args.batch_size, 
+        shuffle=False, 
+        num_workers=2, 
+        pin_memory=(device.type == "cuda")
+    )
 
     # 3. Model, Loss, Optimizer
-    device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
-    print(f"Training on device: {device}")
-
     model = get_dr_model(args.backbone, num_classes=5, pretrained=True).to(device)
 
     # Class weights for Cross-Entropy to handle class imbalance

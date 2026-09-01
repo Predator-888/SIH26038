@@ -5,6 +5,8 @@ __pycache__/
 *.env
 *.db
 .pytest_cache/
+.venv/
+venv/
 
 # Node / Frontend
 node_modules/
