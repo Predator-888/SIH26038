@@ -166,21 +166,14 @@ def evaluate_dataset(csv_path: str, images_dir: str, name: str = "IDRiD Test Set
                 break
 
         if img_path is None:
-            pred = min(4, max(0, true_label))
-            prob_dist = np.zeros(5)
-            prob_dist[pred] = 0.88
-            prob_dist = prob_dist / prob_dist.sum()
-        else:
-            from ml.data.preprocess import apply_ben_graham_preprocessing
-            try:
-                proc_img = apply_ben_graham_preprocessing(img_path, target_size=512)
-                res = dr_grader.predict(proc_img)
-                pred = res["grade"]
-                prob_dist = np.array([float(res["probabilities"][str(i)]) for i in range(5)])
-            except Exception:
-                pred = true_label
-                prob_dist = np.zeros(5)
-                prob_dist[pred] = 1.0
+            print(f"Warning: Image not found for ID {img_id}")
+            continue
+
+        from ml.data.preprocess import preprocess_fundus_pipeline
+        ben_graham_rgb, _ = preprocess_fundus_pipeline(img_path, target_size=512)
+        res = dr_grader.predict(ben_graham_rgb)
+        pred = res["grade"]
+        prob_dist = np.array([float(res["probabilities"][str(i)]) for i in range(5)])
 
         y_true.append(true_label)
         y_pred.append(pred)
