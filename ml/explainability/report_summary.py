@@ -64,6 +64,7 @@ def generate_clinical_summary_text(lesions: List[Dict[str, Any]], grade: int) ->
         counts_by_type[l_type][quad] += 1
 
     summary_clauses = []
+    has_neovasc = False
     for l_type, quad_dict in counts_by_type.items():
         type_name = l_type.replace("_", " ")
         quad_details = []
@@ -72,8 +73,16 @@ def generate_clinical_summary_text(lesions: List[Dict[str, Any]], grade: int) ->
             total_type_count += count
             quad_details.append(f"{count} in {quad}")
         
-        plural_suffix = "s" if total_type_count > 1 and not type_name.endswith("s") else ""
-        clause = f"{total_type_count} {type_name}{plural_suffix} ({', '.join(quad_details)})"
+        if l_type == "neovascularization":
+            has_neovasc = True
+            type_desc = "neovascularization frond" if total_type_count == 1 else "neovascularization fronds"
+            clause = f"{total_type_count} {type_desc} ({', '.join(quad_details)})"
+        else:
+            plural_suffix = "s" if total_type_count > 1 and not type_name.endswith("s") else ""
+            clause = f"{total_type_count} {type_name}{plural_suffix} ({', '.join(quad_details)})"
         summary_clauses.append(clause)
 
-    return ". ".join(summary_clauses).capitalize() + "."
+    full_summary = ". ".join(summary_clauses).capitalize() + "."
+    if has_neovasc or grade == 4:
+        full_summary += " Proliferative DR risk alert: high probability of vitreous hemorrhage; urgent specialist referral indicated."
+    return full_summary

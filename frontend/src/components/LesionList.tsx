@@ -45,6 +45,8 @@ export const LesionList: React.FC<LesionListProps> = ({
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'hemorrhage':
         return 'bg-rose-50 text-rose-700 border-rose-200';
+      case 'neovascularization':
+        return 'bg-purple-50 text-purple-700 border-purple-200';
       default:
         return 'bg-slate-50 text-slate-700 border-slate-200';
     }

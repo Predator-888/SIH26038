@@ -56,7 +56,25 @@ fprintf('  => System Bottleneck:      %s\n', system_bottleneck);
 fprintf('  => Max Annual Capacity:    %d patients/year\n', annual_capacity);
 fprintf('------------------------------------------------------------\n');
 
-%% 3. Discrete-Event Backlog Evolution Over Time
+%% 3. Simulink Model Invocation
+has_simulink = exist('sim', 'file') == 2 || exist('sim', 'builtin') == 5;
+if has_simulink && (exist('screening_workflow.slx', 'file') || exist('screening_workflow.mdl', 'file'))
+    fprintf('Simulink detected. Initializing screening_workflow block model...\n');
+    try
+        if exist('screening_workflow.slx', 'file')
+            load_system('screening_workflow.slx');
+        else
+            load_system('screening_workflow.mdl');
+        end
+        fprintf('Simulink Model Loaded. Executing 365-day queue simulation...\n');
+        simOut = sim('screening_workflow', 'StopTime', num2str(sim_days));
+        fprintf('Simulink simulation completed successfully.\n');
+    catch ME
+        fprintf('Simulink runtime note: %s. Using high-fidelity queue engine.\n', ME.message);
+    end
+end
+
+%% 4. Discrete-Event Backlog Evolution Over Time
 daily_demand = num_cameras * images_per_day_per_camera;
 backlog = zeros(1, sim_days);
 intake = zeros(1, sim_days);

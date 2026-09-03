@@ -70,6 +70,8 @@ export const RetinalEvidenceViewer: React.FC<RetinalEvidenceViewerProps> = ({
         return 'bg-emerald-400 border-emerald-200 text-emerald-950 shadow-emerald-500/50';
       case 'hemorrhage':
         return 'bg-rose-500 border-rose-200 text-white shadow-rose-500/50';
+      case 'neovascularization':
+        return 'bg-purple-500 border-purple-200 text-white shadow-purple-500/50';
       default:
         return 'bg-teal-400 border-teal-200 text-teal-950 shadow-teal-500/50';
     }
@@ -322,6 +324,9 @@ export const RetinalEvidenceViewer: React.FC<RetinalEvidenceViewerProps> = ({
       <div className="px-4 py-2.5 bg-pacs-panel border-t border-pacs-border flex flex-wrap items-center justify-between text-xs text-clinical-400">
         <div className="flex items-center gap-4 text-[11px] font-mono">
           <span className="text-white font-medium">Pathological Markers:</span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" /> Neovascularization
+          </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" /> Hemorrhage
           </span>

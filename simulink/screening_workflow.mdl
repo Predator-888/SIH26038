@@ -1,0 +1,321 @@
+Model {
+  Name			  "screening_workflow"
+  Version		  10.0
+  SavedCharacterEncoding  "UTF-8"
+  GraphicalInterface {
+    NumRootInports	    0
+    NumRootOutports	    3
+    Outport {
+      Name		      "DailyThroughput"
+      BusObject		      ""
+      BusOutputAsStruct	      "off"
+      SignalName	      "DailyProcessedScans"
+    }
+    Outport {
+      Name		      "BacklogCurve"
+      BusObject		      ""
+      BusOutputAsStruct	      "off"
+      SignalName	      "UnreviewedBacklog"
+    }
+    Outport {
+      Name		      "SystemBottleneck"
+      BusObject		      ""
+      BusOutputAsStruct	      "off"
+      SignalName	      "BottleneckCode"
+    }
+    ParameterArgumentNames  ""
+    ComputedModelVersion    "1.42"
+    NumModelReferences	    0
+    NumTestPointedSignals   0
+  }
+  ScopeRefreshTime	  0.035000
+  OverrideTechnique	  "None"
+  DisableAllScopes	  off
+  DataTypeOverride	  "UseLocalSettings"
+  MinMaxOverflowLogging	  "UseLocalSettings"
+  MinMaxOverflowArchiveMode "Overwrite"
+  FPTRunName		  "Run 1"
+  MaxMDLFileLineLength	  120
+  LastModifiedDate	  "Wed Sep 03 08:30:00 2026"
+  ModelVersion		  "1.42"
+  ConfigurationManager	  "none"
+  SimParam {
+    StartTime		    "1.0"
+    StopTime		    "365.0"
+    SolverMode		    "SingleTasking"
+    Solver		    "FixedStepDiscrete"
+    SampleTimeColors	    off
+    ShowPageBoundaries	    off
+    FixedStep		    "1.0"
+  }
+  BlockDefaults {
+    ForegroundColor	    "black"
+    BackgroundColor	    "white"
+    DropShadow		    off
+    NamePlacement	    "normal"
+    FontName		    "Helvetica"
+    FontSize		    10
+    FontWeight		    "normal"
+    FontAngle		    "normal"
+    ShowName		    on
+    Orientation		    "right"
+  }
+  AnnotationDefaults {
+    HorizontalAlignment	    "center"
+    VerticalAlignment	    "middle"
+    ForegroundColor	    "black"
+    BackgroundColor	    "white"
+    DropShadow		    off
+    FontName		    "Helvetica"
+    FontSize		    10
+    FontWeight		    "normal"
+    FontAngle		    "normal"
+  }
+  System {
+    Name		    "screening_workflow"
+    Location		    [100, 100, 1280, 800]
+    Open		    on
+    ModelBrowserVisibility  off
+    ModelBrowserWidth	    200
+    ScreenColor		    "white"
+    PaperOrientation	    "landscape"
+    PaperPositionMode	    "auto"
+    PaperType		    "usletter"
+    PaperUnits		    "inches"
+    TiledPaperMargins	    [0.500000, 0.500000, 0.500000, 0.500000]
+    TiledPageScale	    1
+    ShowPageBoundaries	    off
+    ZoomFactor		    "100"
+    ReportName		    "simulink-default.rpt"
+    Block {
+      BlockType		      Constant
+      Name		      "Daily_Demand_Generator"
+      Position		      [50, 120, 150, 160]
+      Value		      "num_cameras * images_per_day_per_camera"
+      VectorParams1D	      on
+    }
+    Block {
+      BlockType		      Constant
+      Name		      "Bandwidth_Capacity"
+      Position		      [50, 200, 150, 240]
+      Value		      "bandwidth_daily_capacity"
+      VectorParams1D	      on
+    }
+    Block {
+      BlockType		      Constant
+      Name		      "AI_Compute_Capacity"
+      Position		      [50, 280, 150, 320]
+      Value		      "ai_daily_capacity"
+      VectorParams1D	      on
+    }
+    Block {
+      BlockType		      Constant
+      Name		      "Reviewer_Reading_Capacity"
+      Position		      [50, 360, 150, 400]
+      Value		      "reviewer_daily_capacity"
+      VectorParams1D	      on
+    }
+    Block {
+      BlockType		      MinMax
+      Name		      "System_Bottleneck_Detector"
+      Ports		      [3, 1]
+      Position		      [260, 250, 310, 350]
+      Function		      "min"
+      Inputs		      "3"
+      InputSameDT	      off
+    }
+    Block {
+      BlockType		      MinMax
+      Name		      "Effective_Daily_Throughput"
+      Ports		      [2, 1]
+      Position		      [400, 180, 450, 240]
+      Function		      "min"
+      Inputs		      "2"
+      InputSameDT	      off
+    }
+    Block {
+      BlockType		      Sum
+      Name		      "Daily_Net_Backlog_Change"
+      Ports		      [2, 1]
+      Position		      [520, 130, 550, 190]
+      IconShape		      "rectangular"
+      Inputs		      "+-"
+    }
+    Block {
+      BlockType		      DiscreteIntegrator
+      Name		      "Backlog_Accumulator"
+      Ports		      [1, 1]
+      Position		      [620, 140, 670, 180]
+      IntegratorMethod	      "Integration: Forward Euler"
+      ExternalReset	      "none"
+      InitialConditionSource  "internal"
+      InitialCondition	      "0"
+      LimitOutput	      on
+      UpperSaturationLimit    "100000"
+      LowerSaturationLimit    "0"
+      SampleTime	      "1"
+    }
+    Block {
+      BlockType		      Gain
+      Name		      "Annual_Projected_Throughput"
+      Position		      [520, 260, 580, 300]
+      Gain		      "300"
+    }
+    Block {
+      BlockType		      Scope
+      Name		      "Backlog_Evolution_Scope"
+      Ports		      [1]
+      Position		      [750, 144, 780, 176]
+      Floating		      off
+      Location		      [188, 390, 800, 750]
+      Open		      off
+      NumInputPorts	      "1"
+      TickLabels	      "OneTimeTick"
+      ShowLegends	      on
+      LegendLocations	      "Backlog (Patients)"
+      Grid		      "on"
+      TimeRange		      "365"
+      YMin		      "0"
+      YMax		      "5000"
+      SaveName		      "ScopeData"
+      DataFormat	      "StructureWithTime"
+      SampleTime	      "0"
+    }
+    Block {
+      BlockType		      Scope
+      Name		      "Daily_Throughput_Scope"
+      Ports		      [1]
+      Position		      [520, 200, 550, 230]
+      Floating		      off
+      Location		      [188, 100, 800, 400]
+      Open		      off
+      NumInputPorts	      "1"
+      TickLabels	      "OneTimeTick"
+      ShowLegends	      on
+      Grid		      "on"
+      TimeRange		      "365"
+      SaveName		      "ScopeDataThroughput"
+      DataFormat	      "StructureWithTime"
+    }
+    Block {
+      BlockType		      Outport
+      Name		      "DailyThroughput"
+      Position		      [620, 213, 650, 227]
+      IconDisplay	      "Port number"
+    }
+    Block {
+      BlockType		      Outport
+      Name		      "BacklogCurve"
+      Position		      [750, 93, 780, 107]
+      Port		      "2"
+      IconDisplay	      "Port number"
+    }
+    Block {
+      BlockType		      Outport
+      Name		      "SystemBottleneck"
+      Position		      [400, 323, 430, 337]
+      Port		      "3"
+      IconDisplay	      "Port number"
+    }
+    Line {
+      SrcBlock		      "Daily_Demand_Generator"
+      SrcPort		      1
+      Points		      [30, 0]
+      Branch {
+	DstBlock		"Daily_Net_Backlog_Change"
+	DstPort			1
+      }
+      Branch {
+	Points			[0, 55]
+	DstBlock		"Effective_Daily_Throughput"
+	DstPort			1
+      }
+    }
+    Line {
+      SrcBlock		      "Bandwidth_Capacity"
+      SrcPort		      1
+      Points		      [45, 0; 0, 45]
+      DstBlock		      "System_Bottleneck_Detector"
+      DstPort		      1
+    }
+    Line {
+      SrcBlock		      "AI_Compute_Capacity"
+      SrcPort		      1
+      DstBlock		      "System_Bottleneck_Detector"
+      DstPort		      2
+    }
+    Line {
+      SrcBlock		      "Reviewer_Reading_Capacity"
+      SrcPort		      1
+      Points		      [45, 0; 0, -45]
+      DstBlock		      "System_Bottleneck_Detector"
+      DstPort		      3
+    }
+    Line {
+      SrcBlock		      "System_Bottleneck_Detector"
+      SrcPort		      1
+      Points		      [35, 0]
+      Branch {
+	Points			[0, -75]
+	DstBlock		"Effective_Daily_Throughput"
+	DstPort			2
+      }
+      Branch {
+	Points			[0, 30]
+	DstBlock		"SystemBottleneck"
+	DstPort			1
+      }
+    }
+    Line {
+      SrcBlock		      "Effective_Daily_Throughput"
+      SrcPort		      1
+      Points		      [25, 0]
+      Branch {
+	Points			[0, -35]
+	DstBlock		"Daily_Net_Backlog_Change"
+	DstPort			2
+      }
+      Branch {
+	DstBlock		"Daily_Throughput_Scope"
+	DstPort			1
+      }
+      Branch {
+	Points			[0, 10]
+	DstBlock		"DailyThroughput"
+	DstPort			1
+      }
+      Branch {
+	Points			[0, 70]
+	DstBlock		"Annual_Projected_Throughput"
+	DstPort			1
+      }
+    }
+    Line {
+      SrcBlock		      "Daily_Net_Backlog_Change"
+      SrcPort		      1
+      DstBlock		      "Backlog_Accumulator"
+      DstPort		      1
+    }
+    Line {
+      SrcBlock		      "Backlog_Accumulator"
+      SrcPort		      1
+      Points		      [35, 0]
+      Branch {
+	DstBlock		"Backlog_Evolution_Scope"
+	DstPort			1
+      }
+      Branch {
+	Points			[0, -60]
+	DstBlock		"BacklogCurve"
+	DstPort			1
+      }
+    }
+    Annotation {
+      Name		      "SIH26038: District-Scale Telemedicine Screening Simulation\nMathWorks Sponsor Deliverable: Serves 100,000+ Patients/Year"
+      Position		      [380, 50]
+      FontName		      "Helvetica"
+      FontSize		      14
+      FontWeight	      "bold"
+    }
+  }
+}

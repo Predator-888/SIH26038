@@ -112,3 +112,46 @@ def test_telemedicine_simulation_service():
     assert sim_res.bottleneck in ["bandwidth", "processing", "review_capacity", "none"]
     assert len(sim_res.backlog_over_time) > 0
     assert len(sim_res.recommendation) > 10
+
+
+def test_neovascularization_detection_and_pdr_alert():
+    """Verify neovascularization detection formatting and proliferative alert."""
+    lesions = [
+        {"type": "neovascularization", "bbox": [0.30, 0.25, 0.08, 0.06], "confidence": 0.92},
+        {"type": "microaneurysm", "bbox": [0.20, 0.35, 0.02, 0.02], "confidence": 0.84}
+    ]
+    summary = generate_clinical_summary_text(lesions, grade=4)
+    assert "neovascularization" in summary.lower()
+    assert "proliferative dr risk alert" in summary.lower()
+
+
+def test_district_scale_100k_capacity():
+    """Verify system satisfies the official PS requirement: 100,000+ patients/year."""
+    params = SimulationRequest(
+        num_cameras=10,
+        num_reviewers=4,
+        bandwidth_mbps=8.0,
+        images_per_day_per_camera=40,
+        avg_review_time_sec=25,
+        ai_processing_time_sec=3.5
+    )
+    res = simulation_service.run_simulation(params)
+    assert res.annual_screened >= 100000, f"Expected >= 100,000 capacity, got {res.annual_screened}"
+
+
+def test_simulink_and_matlab_files_present():
+    """Verify that all official MathWorks deliverables are present in repository."""
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+    
+    # 1. Simulink models and scripts
+    assert os.path.exists(os.path.join(repo_root, "simulink", "screening_workflow.mdl"))
+    assert os.path.exists(os.path.join(repo_root, "simulink", "build_simulink_model.m"))
+    assert os.path.exists(os.path.join(repo_root, "simulink", "run_simulation.m"))
+    
+    # 2. Native MATLAB Suite
+    assert os.path.exists(os.path.join(repo_root, "matlab", "netraai_master_pipeline.m"))
+    assert os.path.exists(os.path.join(repo_root, "matlab", "retinal_quality_and_preprocess.m"))
+    assert os.path.exists(os.path.join(repo_root, "matlab", "retinal_structure_segmentation.m"))
+    assert os.path.exists(os.path.join(repo_root, "matlab", "dr_grading_inference.m"))
+    assert os.path.exists(os.path.join(repo_root, "matlab", "triage_and_statistics.m"))
+

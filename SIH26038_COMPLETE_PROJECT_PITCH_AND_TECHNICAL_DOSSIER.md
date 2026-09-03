@@ -372,9 +372,10 @@ NetraAI is an end-to-end clinical tele-ophthalmology diagnostic suite that conne
 ---
 
 ### Summary Checklist for Judges (SIH26038 Deliverables)
-- [x] **Image Quality Assessment & Ben Graham Preprocessing** (Focus, illumination, FOV, CLAHE).
-- [x] **Retinal Structure & Lesion Segmentation** (Vessels, Optic Disc, Microaneurysms, Exudates, Hemorrhages).
-- [x] **5-Class DR Severity Grading & Temperature Calibration** (Sensitivity 94.8%, Specificity 92.3%, QWK 0.891).
-- [x] **Visual & Structured Explainability** (Grad-CAM++, quadrant lesion pins, <30-second bilingual report).
-- [x] **MathWorks Simulink Telemedicine Capacity Model** (100,000+ patients/year discrete-event simulation).
+- [x] **Image Quality Assessment & Ben Graham Preprocessing** (Focus, illumination, FOV, CLAHE via OpenCV & MATLAB `retinal_quality_and_preprocess.m`).
+- [x] **Retinal Structure & Lesion Segmentation** (Vessels, Optic Disc, Microaneurysms, Exudates, Hemorrhages, Neovascularization via `unet_lesions.py` & MATLAB `retinal_structure_segmentation.m`).
+- [x] **5-Class DR Severity Grading & Temperature Calibration** (Sensitivity 94.8%, Specificity 92.3%, QWK 0.891; PyTorch weights + ONNX export for MATLAB Deep Learning Toolbox).
+- [x] **Visual & Structured Explainability** (Grad-CAM++, quadrant lesion pins, <30-second bilingual report, and MATLAB `gradCAM()` inference).
+- [x] **MathWorks Simulink Telemedicine Capacity Model** (100,000+ patients/year discrete-event simulation: `simulink/screening_workflow.mdl`, `build_simulink_model.m`, `run_simulation.m`).
+- [x] **Native MATLAB R2024b Suite (`matlab/`)** (One-click master demo `netraai_master_pipeline.m` covering Image Processing, Computer Vision, Deep Learning, Medical Imaging, and Statistics Toolboxes).
 - [x] **Full-Stack Deployment & Interactive PACS UI** (FastAPI backend + React/TypeScript workstation + SOTA benchmark dashboard).
