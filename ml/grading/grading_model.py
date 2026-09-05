@@ -24,7 +24,7 @@ GRADE_LABELS = {
 
 
 class DRGradingModel:
-    def __init__(self, temperature: float = 1.20, uncertain_max: float = 0.70):
+    def __init__(self, temperature: float = 0.90, uncertain_max: float = 0.70):
         self.temperature = temperature
         self.uncertain_max = uncertain_max
         self.device = "cpu"
@@ -65,9 +65,9 @@ class DRGradingModel:
         Computes calibrated 5-class ICDR severity grade based on segmented pathological findings.
         ICDR Clinical Criteria:
         - Grade 0 (No DR): Zero microaneurysms, hemorrhages, or exudates.
-        - Grade 1 (Mild NPDR): Microaneurysms only (1 to 5), no other lesions.
-        - Grade 2 (Moderate NPDR): More than MAs only, or minor exudates/hemorrhages.
-        - Grade 3 (Severe NPDR): Extensive hemorrhages (>=5), large exudates (>=15), or >=18 total lesions.
+        - Grade 1 (Mild NPDR): Microaneurysms only (1 to 3) or solitary petechial dot, no exudates.
+        - Grade 2 (Moderate NPDR): Exudates (any count), hemorrhages (2 to 11 in <3 quadrants), or multiple MAs.
+        - Grade 3 (Severe NPDR): 4-2-1 Rule (>=6 hemorrhages in >=3 quadrants, or >=12 total hemorrhages).
         - Grade 4 (Proliferative DR): Definite neovascularization (NVD/NVE fronds).
         """
         ma_count = sum(1 for l in lesions if l["type"] == "microaneurysm")
@@ -77,34 +77,47 @@ class DRGradingModel:
 
         total_lesions = len(lesions)
 
+        # Check hemorrhage distribution across anatomical quadrants (4-2-1 rule proxy)
+        from ml.explainability.report_summary import get_lesion_quadrant
+        hem_quads = set()
+        for l in lesions:
+            if l["type"] == "hemorrhage":
+                q = get_lesion_quadrant(l["bbox"])
+                if q != "macular region":
+                    hem_quads.add(q)
+
+        is_4_quadrant_severe = (len(hem_quads) >= 3 and hem_count >= 6) or (hem_count >= 12)
+
         # ICDR Clinical Classification Logic
-        if neovasc_count >= 2 or (neovasc_count == 1 and (hem_count >= 2 or exudate_count >= 5)):
+        if neovasc_count >= 2 or (neovasc_count == 1 and hem_count >= 3):
             # Proliferative DR (Requires confirmed neovascular proliferation)
             predicted_grade = 4
-            probs = np.array([0.005, 0.015, 0.06, 0.17, 0.75])
-        elif hem_count >= 5 or exudate_count >= 15 or total_lesions >= 18:
-            # Severe NPDR (Extensive hemorrhages/exudates or 4-2-1 rule proxy)
+            probs = np.array([0.005, 0.015, 0.05, 0.13, 0.80])
+        elif is_4_quadrant_severe:
+            # Severe NPDR (4-2-1 rule: extensive hemorrhages across >= 3 quadrants)
             predicted_grade = 3
-            probs = np.array([0.01, 0.03, 0.14, 0.74, 0.08])
-        elif exudate_count >= 1 or hem_count >= 1 or ma_count > 5:
-            # Moderate NPDR (More than microaneurysms alone)
+            probs = np.array([0.01, 0.03, 0.14, 0.76, 0.06])
+        elif exudate_count >= 1 or hem_count >= 2 or total_lesions >= 4:
+            # Moderate NPDR (Exudates/lipid deposits, moderate hemorrhages, or multiple MAs)
             predicted_grade = 2
-            probs = np.array([0.02, 0.08, 0.77, 0.11, 0.02])
-        elif 1 <= ma_count <= 5 and exudate_count == 0 and hem_count == 0:
-            # Mild NPDR (Microaneurysms only)
+            probs = np.array([0.02, 0.08, 0.80, 0.08, 0.02])
+        elif (1 <= ma_count <= 3 or hem_count == 1) and exudate_count == 0:
+            # Mild NPDR (Microaneurysms only or solitary petechial dot, no exudates)
             predicted_grade = 1
-            probs = np.array([0.15, 0.72, 0.10, 0.02, 0.01])
+            probs = np.array([0.15, 0.72, 0.11, 0.01, 0.01])
         else:
             # No DR (Healthy normal retina)
             predicted_grade = 0
-            probs = np.array([0.94, 0.045, 0.01, 0.003, 0.002])
+            probs = np.array([0.94, 0.04, 0.01, 0.005, 0.005])
 
         top_confidence = float(probs[predicted_grade])
 
         # Assign confidence band
-        if predicted_grade == 0 and top_confidence >= 0.80:
+        if predicted_grade == 0 and top_confidence >= 0.60:
             confidence_band = "confident_normal"
-        elif predicted_grade >= 2 and top_confidence >= 0.70:
+        elif predicted_grade == 1 and top_confidence >= 0.45:
+            confidence_band = "confident_normal"
+        elif predicted_grade >= 2 and top_confidence >= 0.50:
             confidence_band = "confident_referable"
         else:
             confidence_band = "uncertain_review"
@@ -124,7 +137,8 @@ class DRGradingModel:
 
     def predict(self, processed_image: np.ndarray, detected_lesions: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """
-        Evaluates retinal image through deep learning or clinical lesion segmentation fusion.
+        Evaluates retinal image through calibrated multi-modal fusion of deep learning
+        and clinical lesion segmentation findings.
         """
         if detected_lesions is None:
             try:
@@ -165,47 +179,64 @@ class DRGradingModel:
 
                 rule_probs = np.array([float(clinical_res["probabilities"][str(i)]) for i in range(5)])
 
-                # Multi-modal fusion (65% Deep Learning + 35% Clinical Findings)
-                fused_probs = 0.65 * dl_probs + 0.35 * rule_probs
+                # Balanced Multi-Modal Fusion (55% Deep Learning + 45% Clinical Findings)
+                fused_probs = 0.55 * dl_probs + 0.45 * rule_probs
                 fused_probs = fused_probs / np.sum(fused_probs)
 
-                # Clinical Safety Guardrail:
-                # 1. Grade 4 (Proliferative DR) strictly requires proliferative signs (neovascularization or severe hemorrhage)
+                # Extract lesion counts for clinical safety guardrails
                 findings_counts = {}
                 if detected_lesions:
                     for l in detected_lesions:
                         t = l.get("type", "")
                         findings_counts[t] = findings_counts.get(t, 0) + 1
 
+                from ml.explainability.report_summary import get_lesion_quadrant
+                hem_quads = set()
+                for l in (detected_lesions or []):
+                    if l.get("type") == "hemorrhage":
+                        q = get_lesion_quadrant(l["bbox"])
+                        if q != "macular region":
+                            hem_quads.add(q)
+
+                hem_count = findings_counts.get("hemorrhage", 0)
+                neovasc_count = findings_counts.get("neovascularization", 0)
                 total_lesion_count = len(detected_lesions or [])
-                has_proliferative_evidence = (
-                    findings_counts.get("neovascularization", 0) > 0 or
-                    findings_counts.get("hemorrhage", 0) >= 15 or
-                    total_lesion_count >= 30
-                )
+                is_4_quadrant_severe = (len(hem_quads) >= 3 and hem_count >= 6) or (hem_count >= 12)
 
                 fused_grade = int(np.argmax(fused_probs))
 
-                if fused_grade == 4 and not has_proliferative_evidence:
-                    # Penalize PDR class and renormalize
-                    fused_probs[4] *= 0.1
+                # Guardrail 1: PDR Guardrail
+                # Grade 4 (Proliferative DR) strictly requires proliferative signs (neovascularization or severe hemorrhage)
+                if fused_grade == 4 and neovasc_count == 0 and hem_count < 15:
+                    target_sub = 3 if is_4_quadrant_severe else 2
+                    fused_probs[target_sub] += fused_probs[4] * 0.85
+                    fused_probs[4] *= 0.15
                     fused_probs = fused_probs / np.sum(fused_probs)
                     fused_grade = int(np.argmax(fused_probs))
-                    if fused_grade == 4:
-                        fused_grade = 3 if total_lesion_count >= 8 else (2 if total_lesion_count > 0 else 0)
 
-                # 2. A retina with 0 detected lesions cannot be Severe NPDR or Proliferative DR
+                # Guardrail 2: Severe NPDR Guardrail
+                # Exudates alone (even dozens) indicate Diabetic Macular Edema risk (Grade 2), NOT Severe NPDR (Grade 3).
+                # Severe NPDR requires extensive intraretinal hemorrhages meeting the 4-2-1 rule.
+                if fused_grade == 3 and not is_4_quadrant_severe and hem_count <= 2:
+                    fused_probs[2] += fused_probs[3] * 0.85
+                    fused_probs[3] *= 0.15
+                    fused_probs = fused_probs / np.sum(fused_probs)
+                    fused_grade = int(np.argmax(fused_probs))
+
+                # Guardrail 3: Clean Retina Guardrail
+                # A retina with 0 detected lesions cannot be Moderate, Severe, or Proliferative
                 if total_lesion_count == 0 and fused_grade >= 2:
-                    if dl_probs[0] >= 0.20 or fused_probs[0] >= 0.20:
-                        fused_grade = 0
-                    else:
-                        fused_grade = 1
+                    fused_grade = 0 if dl_probs[0] >= 0.15 else 1
+                    fused_probs[0] = max(fused_probs[0], 0.70)
+                    fused_probs = fused_probs / np.sum(fused_probs)
 
                 fused_conf = float(fused_probs[fused_grade])
 
-                if fused_grade == 0 and fused_conf >= 0.70:
+                if fused_grade == 0 and fused_conf >= 0.60:
                     conf_band = "confident_normal"
-                elif fused_grade >= 2 and fused_conf >= 0.60:
+                elif fused_grade == 1 and fused_conf >= 0.45:
+                    conf_band = "confident_normal"
+                elif fused_grade >= 2 and fused_conf >= 0.50:
                     conf_band = "confident_referable"
                 else:
                     conf_band = "uncertain_review"
