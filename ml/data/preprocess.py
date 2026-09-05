@@ -73,8 +73,8 @@ def apply_ben_graham_preprocessing(
     mask_normalized = mask_blur.astype(np.float32) / 255.0
     mask_3ch = np.repeat(mask_normalized[:, :, np.newaxis], 3, axis=2)
     
-    # Blend with neutral background
-    processed = (enhanced.astype(np.float32) * mask_3ch + 128.0 * (1.0 - mask_3ch)).astype(np.uint8)
+    # Apply clean circular vignette matching training distribution
+    processed = cv2.bitwise_and(enhanced, enhanced, mask=mask)
     return processed
 
 
