@@ -14,17 +14,51 @@
 
 ---
 
-## Table of Contents
-1. [The Crisis: Rural Diabetic Retinopathy in India](#1-the-crisis-rural-diabetic-retinopathy-in-india)
-2. [Medical Primer: Fundus Anatomy & ICDR Pathology](#2-medical-primer-fundus-anatomy--icdr-pathology)
-3. [Competitive Landscape & Prior Art (Sourced Benchmarks)](#3-competitive-landscape--prior-art-sourced-benchmarks)
-4. [Our Solution: NetraAI Architectural Overview](#4-our-solution-netraai-architectural-overview)
-5. [The 4 Defensible Differentiators (Why NetraAI Wins)](#5-the-4-defensible-differentiators-why-netraai-wins)
-6. [Deep-Dive: The 5 Core Modules](#6-deep-dive-the-5-core-modules)
-7. [Technical Architecture & Stack Specifications](#7-technical-architecture--stack-specifications)
-8. [Empirical Ablation Study & Robustness Results](#8-empirical-ablation-study--robustness-results)
-9. [Step-by-Step Live Demo Script (Judging Checklist)](#9-step-by-step-live-demo-script-judging-checklist)
-10. [Jury Q&A Defense Strategy](#10-jury-qa-defense-strategy)
+14: 
+15: ---
+16: 
+17: ## 💡 Beginner's Primer: How to Understand & Explain This Project in 5 Minutes
+18: *(Read this if you know zero technical or medical terminology — it equips you to explain the entire system effortlessly)*
+19: 
+20: ### 1. What is the Core Story?
+21: Imagine a diabetic farmer in a remote village in Rajasthan or Bihar. Over time, high blood sugar quietly damages the microscopic blood vessels in the back of his eye (the retina). He feels no pain and has no early warning signs. By the time his vision turns blurry, his retina is permanently damaged, and he becomes blind.
+22: 
+23: In India, **77 million people have diabetes**, but there is only **1 eye specialist for every 100,000 rural citizens**. If every patient traveled to the city hospital, waiting lines would stretch for months.
+24: 
+25: **NetraAI solves this:** An ASHA community worker in the village takes a photo of the farmer's eye using a cheap camera connected to a tablet. In **under 60 seconds**, the AI:
+26: 1. Checks if the photo is sharp (if blurry, asks to retake immediately).
+27: 2. Looks for microscopic bleeding and fat deposits.
+28: 3. Gives a severity grade from 0 (Healthy) to 4 (Urgent Surgery Required).
+29: 4. Shows a bright red/yellow heatmap (Grad-CAM) proving to doctors *why* it made the diagnosis.
+30: 5. Prints an official bilingual referral slip in English + Hindi so the farmer can get fast-track hospital care.
+31: 
+32: ### 2. Who are the 3 People Using This?
+33: 1. **The ASHA Worker in the Village:** Needs big buttons, clear green/yellow/red status indicators, and an instant alert if the eye photo is too blurry or dark.
+34: 2. **The Eye Specialist at the City Hospital:** Needs to see the exact medical evidence (blood vessels and lesion callouts) so they can trust and sign off on the AI's diagnosis in **under 30 seconds**.
+35: 3. **The District Chief Medical Officer (CMO):** Needs to know how many eye doctors and cameras are required to screen 100,000+ patients a year without hospital collapse (solved by our MathWorks Simulink model!).
+36: 
+37: ### 3. Real-World Analogies for the Technology
+38: - **The Quality Gatekeeper (`ml/quality/`):** The **Bouncer at the Door**. If an image is blurry or dark, it turns it away immediately so doctors don't waste time looking at bad photos.
+39: - **Ben Graham Preprocessing (`ml/data/`):** The **Lighting Equalizer**. Some photos are taken under bright fluorescent tubes, some in dim huts. This algorithm mathematically strips away lighting differences so all retinas look standardized.
+40: - **U-Net Segmentation (`ml/segmentation/`):** The **Highlighter Pen**. It traces out the exact outline of blood vessels and highlights every single microscopic blood spot or fat crust.
+41: - **EfficientNet-B3 Classifier (`ml/grading/`):** The **Expert Radiologist**. It looks at the whole eye and delivers the 5-class clinical diagnosis (Grade 0 to Grade 4).
+42: - **Grad-CAM Explainability (`ml/explainability/`):** The **Courtroom Evidence Marker**. It lights up the exact pixels that influenced the AI's decision so doctors don't have to trust a "black box".
+43: - **MathWorks Simulink (`simulink/`):** The **City Traffic Control Simulator**. It simulates patient arrivals, internet transmission delays, and doctor reading speeds, mathematically proving that our AI eliminates hospital backlogs for 500,000 citizens.
+44: 
+45: ---
+46: 
+47: ## Table of Contents
+48: 1. [Beginner's Primer: How to Understand & Explain This Project in 5 Minutes](#-beginners-primer-how-to-understand--explain-this-project-in-5-minutes)
+49: 2. [The Crisis: Rural Diabetic Retinopathy in India](#1-the-crisis-rural-diabetic-retinopathy-in-india)
+50: 3. [Medical Primer: Fundus Anatomy & ICDR Pathology](#2-medical-primer-fundus-anatomy--icdr-pathology)
+51: 4. [Competitive Landscape & Prior Art (Sourced Benchmarks)](#3-competitive-landscape--prior-art-sourced-benchmarks)
+52: 5. [Our Solution: NetraAI Architectural Overview](#4-our-solution-netraai-architectural-overview)
+53: 6. [The 4 Defensible Differentiators (Why NetraAI Wins)](#5-the-4-defensible-differentiators-why-netraai-wins)
+54: 7. [Deep-Dive: The 5 Core Modules](#6-deep-dive-the-5-core-modules)
+55: 8. [Technical Architecture & Stack Specifications](#7-technical-architecture--stack-specifications)
+56: 9. [Empirical Ablation Study & Robustness Results](#8-empirical-ablation-study--robustness-results)
+57: 10. [Step-by-Step Live Demo Script (Judging Checklist)](#9-step-by-step-live-demo-script-judging-checklist)
+58: 11. [Jury Q&A Defense Strategy](#10-jury-qa-defense-strategy)
 
 ---
 
@@ -247,19 +281,32 @@ NetraAI is an end-to-end clinical tele-ophthalmology diagnostic suite that conne
 ├─────────────────────────┼───────────────────────────┼──────────────────────────────────┤
 │ Computer Vision         │ OpenCV 4.9 + Scikit-Image │ Ben Graham & CLAHE preprocessing │
 ├─────────────────────────┼───────────────────────────┼──────────────────────────────────┤
-│ Explainability (XAI)    │ Grad-CAM++ Hooks          │ Gradient-weighted saliency maps  │
+│ Interoperability Bridge │ ONNX 1.16 (ml/export_onnx)│ Standard 1x3x512x512 neural link │
+├─────────────────────────┼───────────────────────────┼──────────────────────────────────┤
+│ Native MATLAB Pipeline  │ MATLAB R2024b (6 Boxes)   │ NetraAI master pipeline & XAI    │
+├─────────────────────────┼───────────────────────────┼──────────────────────────────────┤
+│ Native Explainability   │ MATLAB gradCAM() API      │ Native Deep Learning Toolbox XAI │
+├─────────────────────────┼───────────────────────────┼──────────────────────────────────┤
+│ Telemedicine Simulation │ Simulink & SimEvents      │ 500k-citizen district queue model│
 ├─────────────────────────┼───────────────────────────┼──────────────────────────────────┤
 │ Backend REST API        │ FastAPI + SQLModel        │ Async REST & SQLite persistence  │
 ├─────────────────────────┼───────────────────────────┼──────────────────────────────────┤
-│ Frontend Workstation    │ React 18 + Vite + TS      │ High-speed PACS UI & darkroom    │
+│ Frontend Workstation    │ React 18 + Vite + TS      │ High-speed PACS UI & touch UX    │
 ├─────────────────────────┼───────────────────────────┼──────────────────────────────────┤
 │ Styling & Tokens        │ Tailwind CSS 3.4          │ Medical-grade clinical tokens    │
-├─────────────────────────┼───────────────────────────┼──────────────────────────────────┤
-│ Telemedicine Simulation │ MATLAB R2024b & Simulink  │ Discrete-event queue modeling    │
 ├─────────────────────────┼───────────────────────────┼──────────────────────────────────┤
 │ Cloud Deployment        │ Render Web + Static Site  │ Unified cloud hosting & REST API │
 └─────────────────────────┴───────────────────────────┴──────────────────────────────────┘
 ```
+
+### 7.1 The MathWorks Native Toolboxes Mapping
+Our repository features a 100% native MATLAB suite in `matlab/` satisfying all 6 competition toolboxes:
+1. **Image Processing Toolbox:** `matlab/retinal_quality_and_preprocess.m` (Ben Graham local color subtraction, `adapthisteq` green CLAHE, morphological top-hat).
+2. **Computer Vision Toolbox:** `matlab/retinal_quality_and_preprocess.m` (Laplacian blur variance, circular FOV detection).
+3. **Deep Learning Toolbox:** `matlab/evaluate_onnx_model.m` and `matlab/dr_grading_inference.m` (`importNetworkFromONNX`, 5-class forward pass, native `gradCAM(net, dlImage, classIdx)`).
+4. **Medical Imaging Toolbox:** `matlab/retinal_structure_segmentation.m` (Optic disc morphological segmentation via `strel('disk', 25)`, vascular arcade density, quadrant lesion index).
+5. **Statistics and Machine Learning Toolbox:** `matlab/triage_and_statistics.m` (Temperature scaling $T=1.24$, calibrated softmax distributions, 3-band population triage).
+6. **Simulink & SimEvents:** `simulink/run_simulation.m` and `simulink/build_telemedicine_model.m` (District-scale discrete-event entity queue simulation for 500,000 citizens).
 
 ---
 
