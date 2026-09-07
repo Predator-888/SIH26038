@@ -62,7 +62,7 @@ export const FieldWorkerCaptureView: React.FC<FieldWorkerCaptureViewProps> = ({ 
   };
 
   // High-fidelity clinical retinal image generator for testing
-  const loadClinicalBenchmarkScan = async (type: 'normal' | 'moderate' | 'severe' | 'blurry') => {
+  const loadClinicalBenchmarkScan = async (type: 'normal' | 'mild' | 'moderate' | 'severe' | 'proliferative' | 'blurry') => {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 512;
@@ -126,6 +126,18 @@ export const FieldWorkerCaptureView: React.FC<FieldWorkerCaptureViewProps> = ({ 
     drawVessel(380, 256, 420, 300, 460, 330, 485, 340, 3.0);
 
     // Add lesions based on scenario
+    if (type === 'mild') {
+      // Mild NPDR: isolated microaneurysms only (no exudates, no large hemorrhages)
+      ctx.fillStyle = '#610602';
+      [
+        [220, 210, 2.2], [270, 280, 2.5], [195, 300, 2.0]
+      ].forEach(([x, y, r]) => {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
     if (type === 'moderate' || type === 'severe') {
       // Hard Exudates
       ctx.fillStyle = '#FFFDE7';
@@ -165,11 +177,36 @@ export const FieldWorkerCaptureView: React.FC<FieldWorkerCaptureViewProps> = ({ 
     if (type === 'severe') {
       ctx.fillStyle = '#260201';
       [
-        [280, 330, 9], [150, 290, 8], [310, 180, 7.5]
+        [280, 330, 9], [150, 290, 8], [310, 180, 7.5], [170, 350, 8], [330, 220, 7]
       ].forEach(([x, y, r]) => {
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
+      });
+    }
+
+    if (type === 'proliferative') {
+      // Extensive vitreous / preretinal blot hemorrhages
+      ctx.fillStyle = '#260201';
+      [
+        [280, 330, 10], [150, 290, 9], [310, 180, 8.5], [170, 350, 9], [330, 220, 8], [240, 210, 7.5]
+      ].forEach(([x, y, r]) => {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      // Neovascular fronds near optic disc (NVD)
+      ctx.strokeStyle = '#8B0000';
+      ctx.lineWidth = 1.5;
+      [
+        [[370, 240], [360, 230], [350, 235], [365, 245]],
+        [[390, 270], [405, 280], [415, 275], [400, 265]],
+        [[250, 180], [240, 170], [235, 178], [248, 185]]
+      ].forEach((pts) => {
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.stroke();
       });
     }
 
@@ -425,13 +462,20 @@ export const FieldWorkerCaptureView: React.FC<FieldWorkerCaptureViewProps> = ({ 
               <FolderOpen className="w-3.5 h-3.5 text-medical" />
               <span>Load Reference Test Scans:</span>
             </div>
-            <div className="grid grid-cols-4 gap-2 text-xs">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs">
               <button
                 type="button"
                 onClick={() => loadClinicalBenchmarkScan('normal')}
                 className="p-2 rounded-lg bg-clinical-50 hover:bg-clinical-100 border border-clinical-200 text-clinical-800 font-semibold text-center transition-colors"
               >
                 Normal (L0)
+              </button>
+              <button
+                type="button"
+                onClick={() => loadClinicalBenchmarkScan('mild')}
+                className="p-2 rounded-lg bg-clinical-50 hover:bg-clinical-100 border border-clinical-200 text-clinical-800 font-semibold text-center transition-colors"
+              >
+                Mild (L1)
               </button>
               <button
                 type="button"
@@ -446,6 +490,13 @@ export const FieldWorkerCaptureView: React.FC<FieldWorkerCaptureViewProps> = ({ 
                 className="p-2 rounded-lg bg-clinical-50 hover:bg-clinical-100 border border-clinical-200 text-clinical-800 font-semibold text-center transition-colors"
               >
                 Severe (L3)
+              </button>
+              <button
+                type="button"
+                onClick={() => loadClinicalBenchmarkScan('proliferative')}
+                className="p-2 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-semibold text-center transition-colors"
+              >
+                PDR (L4)
               </button>
               <button
                 type="button"

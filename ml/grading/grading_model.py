@@ -177,13 +177,6 @@ class DRGradingModel:
                     calibrated_logits = logits / self.temperature
                     dl_probs = torch.softmax(calibrated_logits, dim=1)[0].numpy()
 
-                rule_probs = np.array([float(clinical_res["probabilities"][str(i)]) for i in range(5)])
-
-                # Balanced Multi-Modal Fusion (55% Deep Learning + 45% Clinical Findings)
-                fused_probs = 0.55 * dl_probs + 0.45 * rule_probs
-                fused_probs = fused_probs / np.sum(fused_probs)
-
-                # Extract lesion counts for clinical safety guardrails
                 findings_counts = {}
                 if detected_lesions:
                     for l in detected_lesions:
@@ -199,45 +192,40 @@ class DRGradingModel:
                             hem_quads.add(q)
 
                 hem_count = findings_counts.get("hemorrhage", 0)
+                exudate_count = findings_counts.get("exudate", 0)
+                ma_count = findings_counts.get("microaneurysm", 0)
                 neovasc_count = findings_counts.get("neovascularization", 0)
                 total_lesion_count = len(detected_lesions or [])
                 is_4_quadrant_severe = (len(hem_quads) >= 3 and hem_count >= 6) or (hem_count >= 12)
 
+                # Clinical evidence prior distribution (Bayesian refinement)
+                if neovasc_count >= 1:
+                    rule_prior = np.array([0.01, 0.04, 0.15, 0.30, 0.50])
+                elif is_4_quadrant_severe:
+                    rule_prior = np.array([0.02, 0.05, 0.25, 0.55, 0.13])
+                elif exudate_count >= 1 or hem_count >= 2:
+                    rule_prior = np.array([0.05, 0.15, 0.60, 0.15, 0.05])
+                elif ma_count >= 1 or hem_count == 1:
+                    rule_prior = np.array([0.15, 0.60, 0.20, 0.03, 0.02])
+                else:
+                    rule_prior = np.array([0.55, 0.25, 0.12, 0.05, 0.03])
+
+                # Multi-modal fusion: 75% Deep Learning (EfficientNet-B3) + 25% Anatomical Evidence Prior
+                fused_probs = 0.75 * dl_probs + 0.25 * rule_prior
+                fused_probs = fused_probs / np.sum(fused_probs)
                 fused_grade = int(np.argmax(fused_probs))
-
-                # Guardrail 1: PDR Guardrail
-                # Grade 4 (Proliferative DR) strictly requires proliferative signs (neovascularization or severe hemorrhage)
-                if fused_grade == 4 and neovasc_count == 0 and hem_count < 15:
-                    target_sub = 3 if is_4_quadrant_severe else 2
-                    fused_probs[target_sub] += fused_probs[4] * 0.85
-                    fused_probs[4] *= 0.15
-                    fused_probs = fused_probs / np.sum(fused_probs)
-                    fused_grade = int(np.argmax(fused_probs))
-
-                # Guardrail 2: Severe NPDR Guardrail
-                # Exudates alone (even dozens) indicate Diabetic Macular Edema risk (Grade 2), NOT Severe NPDR (Grade 3).
-                # Severe NPDR requires extensive intraretinal hemorrhages meeting the 4-2-1 rule.
-                if fused_grade == 3 and not is_4_quadrant_severe and hem_count <= 2:
-                    fused_probs[2] += fused_probs[3] * 0.85
-                    fused_probs[3] *= 0.15
-                    fused_probs = fused_probs / np.sum(fused_probs)
-                    fused_grade = int(np.argmax(fused_probs))
-
-                # Guardrail 3: Clean Retina Guardrail
-                # A retina with 0 detected lesions cannot be Moderate, Severe, or Proliferative
-                if total_lesion_count == 0 and fused_grade >= 2:
-                    fused_grade = 0 if dl_probs[0] >= 0.15 else 1
-                    fused_probs[0] = max(fused_probs[0], 0.70)
-                    fused_probs = fused_probs / np.sum(fused_probs)
-
                 fused_conf = float(fused_probs[fused_grade])
 
-                if fused_grade == 0 and fused_conf >= 0.60:
+                # Confidence band assignment based on concordance and calibration
+                # Confident Normal: Grade 0/1 with solid confidence
+                if fused_grade == 0 and fused_conf >= 0.45 and total_lesion_count <= 1:
                     conf_band = "confident_normal"
-                elif fused_grade == 1 and fused_conf >= 0.45:
+                elif fused_grade == 1 and fused_conf >= 0.40 and exudate_count == 0:
                     conf_band = "confident_normal"
-                elif fused_grade >= 2 and fused_conf >= 0.50:
+                # Confident Referable: Grade >= 2 with concordant lesions or strong DL certainty
+                elif fused_grade >= 2 and (fused_conf >= 0.50 or total_lesion_count >= 2):
                     conf_band = "confident_referable"
+                # Borderline / Discordant findings route to Reading Center Review Queue
                 else:
                     conf_band = "uncertain_review"
 
