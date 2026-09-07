@@ -21,6 +21,13 @@ from backend.app.routers.reminders import (
     ScheduleReminderRequest,
     SendAdhocSMSRequest
 )
+from backend.app.config import settings
+
+
+@pytest.fixture(autouse=True)
+def force_mock_sms_in_tests(monkeypatch):
+    """Ensure tests run predictably in mock mode regardless of .env configuration."""
+    monkeypatch.setattr(settings, "SMS_PROVIDER", "mock")
 
 
 def test_calculate_followup_intervals():
@@ -157,3 +164,12 @@ def test_router_endpoints_direct():
         )
         custom_res = send_custom_sms(custom_req, session=session)
         assert custom_res["success"] is True
+
+
+def test_fast2sms_provider_branching(monkeypatch):
+    """Verify Fast2SMS error reporting when carrier account needs verification."""
+    monkeypatch.setattr(settings, "SMS_PROVIDER", "fast2sms")
+    with Session(engine) as session:
+        res = sms_service.send_sms("+919999999999", "Test NetraAI Alert", session=session)
+        assert res["provider"] == "fast2sms"
+        assert "Fast2SMS" in res["provider_response"]

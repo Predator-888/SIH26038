@@ -118,17 +118,22 @@ class SMSService:
         and persists the transaction to the SMSLog audit table.
         """
         clean_phone = "".join(c for c in phone_number if c.isdigit() or c == "+")
-        provider_used = self.provider
+        provider_used = (settings.SMS_PROVIDER or self.provider or "mock").lower()
+        fast2sms_key = settings.FAST2SMS_API_KEY or self.fast2sms_key
+        twilio_sid = settings.TWILIO_ACCOUNT_SID or self.twilio_sid
+        twilio_token = settings.TWILIO_AUTH_TOKEN or self.twilio_token
+        twilio_from = settings.TWILIO_PHONE_NUMBER or self.twilio_from
+
         status = "delivered"
         provider_resp = "Simulated delivery successful (Mock Gateway)"
 
         # 1. Dispatch through chosen provider
-        if self.provider == "fast2sms" and self.fast2sms_key:
+        if provider_used == "fast2sms" and fast2sms_key:
             try:
                 # Fast2SMS Quick SMS API for Indian numbers
                 url = "https://www.fast2sms.com/dev/bulkV2"
                 headers = {
-                    "authorization": self.fast2sms_key,
+                    "authorization": fast2sms_key,
                     "Content-Type": "application/json"
                 }
                 # Normalize phone to 10 digits
@@ -140,12 +145,19 @@ class SMSService:
                     "numbers": dest_phone
                 }
                 res = requests.post(url, json=payload, headers=headers, timeout=8)
-                if res.status_code == 200 and res.json().get("return"):
+                try:
+                    resp_json = res.json()
+                except Exception:
+                    resp_json = {}
+
+                if res.status_code == 200 and resp_json.get("return"):
                     status = "delivered"
-                    provider_resp = res.text[:250]
+                    raw_msg = resp_json.get("message", "Delivered successfully")
+                    provider_resp = raw_msg[0] if isinstance(raw_msg, list) and raw_msg else str(raw_msg)
                 else:
                     status = "failed"
-                    provider_resp = f"HTTP {res.status_code}: {res.text[:250]}"
+                    err_msg = resp_json.get("message", res.text[:200])
+                    provider_resp = f"Fast2SMS: {err_msg}"
             except Exception as e:
                 logger.error(f"Fast2SMS error: {e}")
                 status = "failed"
