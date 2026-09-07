@@ -202,11 +202,14 @@ class DRGradingModel:
                 if neovasc_count >= 1:
                     rule_prior = np.array([0.01, 0.04, 0.15, 0.30, 0.50])
                 elif is_4_quadrant_severe:
-                    rule_prior = np.array([0.02, 0.05, 0.25, 0.55, 0.13])
+                    rule_prior = np.array([0.02, 0.05, 0.25, 0.45, 0.23])
                 elif exudate_count >= 1 or hem_count >= 2:
-                    rule_prior = np.array([0.05, 0.15, 0.60, 0.15, 0.05])
+                    # Exudates & intraretinal hemorrhages confirm DR pathology (Level 2+).
+                    # Distributed across Grade 2 (Moderate), Grade 3 (Severe), and Grade 4 (PDR)
+                    # allowing Deep Learning features to accurately distinguish advanced stages.
+                    rule_prior = np.array([0.03, 0.07, 0.40, 0.25, 0.25])
                 elif ma_count >= 1 or hem_count == 1:
-                    rule_prior = np.array([0.15, 0.60, 0.20, 0.03, 0.02])
+                    rule_prior = np.array([0.15, 0.55, 0.22, 0.05, 0.03])
                 else:
                     rule_prior = np.array([0.55, 0.25, 0.12, 0.05, 0.03])
 
