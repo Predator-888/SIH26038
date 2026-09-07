@@ -6,6 +6,7 @@ import { RetinalEvidenceViewer } from '../components/RetinalEvidenceViewer';
 import { GradeBadge } from '../components/GradeBadge';
 import { StatusBadge } from '../components/StatusBadge';
 import { LesionList } from '../components/LesionList';
+import { PatientSMSReminderCard } from '../components/PatientSMSReminderCard';
 import { 
   FileText, 
   ArrowLeft, 
@@ -196,6 +197,14 @@ export const CaseResultView: React.FC<CaseResultViewProps> = ({
 
           {/* Indexed Lesions List */}
           <LesionList lesions={explainability?.lesions || []} />
+
+          {/* Automated Patient SMS Follow-up & Reminder Module */}
+          <PatientSMSReminderCard
+            caseId={case_id}
+            patientRef={patientId}
+            grade={gradeVal}
+            gradeLabel={gradeLabel}
+          />
 
         </div>
 

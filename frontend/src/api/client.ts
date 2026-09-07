@@ -6,7 +6,9 @@ import {
   SimulationParams, 
   SimulationResult,
   CompetitiveTableResponse,
-  AblationResponse
+  AblationResponse,
+  CaseRemindersResponse,
+  SMSLogItem
 } from '../types/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -113,5 +115,47 @@ export const api = {
   getAblationResults: async (): Promise<AblationResponse> => {
     const response = await apiClient.get<AblationResponse>('/benchmarks/ablation-results');
     return response.data;
+  },
+
+  // 10. Patient Follow-up Reminders & SMS Notifications
+  getCaseReminders: async (caseId: string): Promise<CaseRemindersResponse> => {
+    const response = await apiClient.get<CaseRemindersResponse>(`/cases/${caseId}/reminders`);
+    return response.data;
+  },
+
+  scheduleCaseReminders: async (caseId: string, patientPhone: string, language: string = 'en') => {
+    const response = await apiClient.post(`/cases/${caseId}/reminders`, {
+      patient_phone: patientPhone,
+      language: language
+    });
+    return response.data;
+  },
+
+  sendReminderSMS: async (reminderId: number) => {
+    const response = await apiClient.post(`/reminders/${reminderId}/send`);
+    return response.data;
+  },
+
+  sendCustomSMS: async (params: {
+    caseId: string;
+    phoneNumber: string;
+    reminderType: string;
+    language?: string;
+    customText?: string;
+  }) => {
+    const response = await apiClient.post('/reminders/send-custom', {
+      case_id: params.caseId,
+      phone_number: params.phoneNumber,
+      reminder_type: params.reminderType,
+      language: params.language || 'en',
+      custom_text: params.customText
+    });
+    return response.data;
+  },
+
+  getSMSLogs: async (limit: number = 50): Promise<SMSLogItem[]> => {
+    const response = await apiClient.get<SMSLogItem[]>(`/reminders/logs?limit=${limit}`);
+    return response.data;
   }
 };
+

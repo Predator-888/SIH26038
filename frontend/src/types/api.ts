@@ -148,3 +148,38 @@ export interface AblationResponse {
   };
 }
 
+export interface PatientReminderItem {
+  id: number;
+  case_id: string;
+  patient_ref: string;
+  patient_phone: string;
+  reminder_type: 'blood_sugar' | 'hba1c' | 'retinal_screening' | 'specialist_referral';
+  title: string;
+  interval_days: number;
+  due_date: string;
+  language: string;
+  status: 'scheduled' | 'sent' | 'cancelled';
+  last_sent_at?: string;
+  created_at: string;
+  notes?: string;
+}
+
+export interface SMSLogItem {
+  id: number;
+  reminder_id?: number;
+  case_id?: string;
+  recipient_phone: string;
+  message_text: string;
+  reminder_type?: string;
+  provider: string;
+  status: 'delivered' | 'sent' | 'failed';
+  provider_response?: string;
+  sent_at: string;
+}
+
+export interface CaseRemindersResponse {
+  case_id: string;
+  reminders: PatientReminderItem[];
+  sms_logs: SMSLogItem[];
+}
+

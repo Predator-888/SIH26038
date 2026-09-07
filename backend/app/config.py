@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
 
+    # SMS Gateway Configuration
+    SMS_PROVIDER: str = "mock"  # mock | fast2sms | twilio
+    FAST2SMS_API_KEY: str = ""
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_PHONE_NUMBER: str = ""
+    DEFAULT_REMINDER_LANGUAGE: str = "en"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

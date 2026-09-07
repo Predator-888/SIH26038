@@ -12,7 +12,7 @@ from fastapi.exceptions import RequestValidationError
 
 from backend.app.config import settings
 from backend.app.database import init_db
-from backend.app.routers import cases, analysis, reports, simulation, health, benchmarks
+from backend.app.routers import cases, analysis, reports, simulation, health, benchmarks, reminders
 
 
 @asynccontextmanager
@@ -51,6 +51,7 @@ app.include_router(reports.router, prefix=api_v1_prefix)
 app.include_router(simulation.router, prefix=api_v1_prefix)
 app.include_router(health.router, prefix=api_v1_prefix)
 app.include_router(benchmarks.router, prefix=api_v1_prefix)
+app.include_router(reminders.router, prefix=api_v1_prefix)
 
 
 # 4. Standardized Error Handling per Tech Stack §5.9

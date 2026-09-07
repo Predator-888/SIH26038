@@ -6,6 +6,7 @@ import { RetinalEvidenceViewer } from '../components/RetinalEvidenceViewer';
 import { GradeBadge } from '../components/GradeBadge';
 import { StatusBadge } from '../components/StatusBadge';
 import { LesionList } from '../components/LesionList';
+import { PatientSMSReminderCard } from '../components/PatientSMSReminderCard';
 import { 
   ArrowLeft, 
   CheckCircle2, 
@@ -346,6 +347,14 @@ export const CaseDetailReviewView: React.FC<CaseDetailReviewViewProps> = ({
             </button>
 
           </div>
+
+          {/* Automated Patient SMS Follow-up & Reminder Module */}
+          <PatientSMSReminderCard
+            caseId={caseId}
+            patientRef={patientId}
+            grade={grading?.grade}
+            gradeLabel={grading?.grade_label}
+          />
 
         </div>
 
