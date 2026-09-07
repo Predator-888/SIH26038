@@ -200,7 +200,11 @@ export const FieldWorkerCaptureView: React.FC<FieldWorkerCaptureViewProps> = ({ 
       const response = await api.uploadCase(selectedFile, refString);
       onUploadSuccess(response, selectedFile);
     } catch (err: any) {
-      const msg = err.response?.data?.error?.message || 'Failed to connect to backend server. Verify server is running on port 8000.';
+      const msg =
+        err.response?.data?.detail?.message ||
+        (typeof err.response?.data?.detail === 'string' ? err.response?.data?.detail : null) ||
+        err.response?.data?.error?.message ||
+        'Failed to connect to backend server. Verify server is running on port 8000.';
       setError(msg);
     } finally {
       setLoading(false);

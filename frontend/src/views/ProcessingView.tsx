@@ -44,7 +44,14 @@ export const ProcessingView: React.FC<ProcessingViewProps> = ({
           if (onAnalysisComplete) onAnalysisComplete(result);
         }, 1200);
       } catch (err: any) {
-        const msg = err.response?.data?.error?.message || 'Pipeline analysis failed. Please try again.';
+        const msg =
+          err.response?.data?.detail?.message ||
+          (typeof err.response?.data?.detail === 'string' ? err.response?.data?.detail : null) ||
+          err.response?.data?.error?.message ||
+          (err.message === 'Network Error'
+            ? 'Cannot connect to backend server (Port 8000). Please ensure the backend is running.'
+            : err.message) ||
+          'Pipeline analysis failed. Please try again.';
         onError(msg);
       }
     };
