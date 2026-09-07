@@ -1,124 +1,145 @@
 """
 Retinal Lesion Segmentation Module (SIH26038).
-Segments true pathological microaneurysms, hard/soft exudates, and intraretinal hemorrhages.
-Ensures zero false positives on healthy, normal retinal fundus scans.
+Segments true pathological microaneurysms, hard/soft exudates, intraretinal hemorrhages,
+and neovascularization fronds (NVD/NVE).
+Calibrated for Ben Graham preprocessed fundus images with multi-modal clinical intelligence.
 """
 
 import cv2
 import numpy as np
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 
 
-class LesionSegmentation:
+class UnifiedLesionSegmentor:
     def __init__(self):
         pass
 
-    def _get_inner_retinal_mask(self, rgb_image: np.ndarray, margin_ratio: float = 0.05) -> np.ndarray:
+    def _get_inner_retinal_mask(self, rgb_image: np.ndarray, safe_ratio: float = 0.38) -> np.ndarray:
         """
-        Creates a clean inner circular retinal mask safely inset from the outer boundary
-        to completely eliminate circular vignette glare and rim border artifacts.
+        Creates a clean inner circular retinal mask safely within the illuminated FOV
+        to eliminate circular vignette glare, perimeter border artifacts, and edge noise.
         """
         h, w = rgb_image.shape[:2]
         center = (w // 2, h // 2)
-        safe_radius = int(min(h, w) * (0.48 - margin_ratio))
+        safe_radius = int(min(h, w) * safe_ratio)
         inner_mask = np.zeros((h, w), dtype=np.uint8)
         cv2.circle(inner_mask, center, safe_radius, 255, -1)
         return inner_mask
 
-    def detect_exudates(self, rgb_image: np.ndarray, optic_disc: Tuple[int, int, int], inner_mask: np.ndarray) -> List[Dict[str, Any]]:
+    def detect_exudates(
+        self,
+        rgb_image: np.ndarray,
+        optic_disc: Tuple[int, int, int],
+        inner_mask: np.ndarray
+    ) -> List[Dict[str, Any]]:
         """
         Detects bright yellowish-white lipid exudates outside the optic disc.
+        Exudates exhibit high intensity in red/green channels and distinct contrast against blue.
         """
         h, w, _ = rgb_image.shape
         r = rgb_image[:, :, 0].astype(np.float32)
         g = rgb_image[:, :, 1].astype(np.float32)
         b = rgb_image[:, :, 2].astype(np.float32)
-
-        # In Ben Graham images, background is ~110-128. True exudates are distinct bright yellowish-white deposits
         brightness = (r + g + b) / 3.0
-        exudate_candidates = (brightness > 195) & (r > 185) & (g > 180) & (g > b * 1.05)
-        mask = (exudate_candidates * 255).astype(np.uint8)
-        
-        # Apply inner mask to prevent rim glare
-        mask[inner_mask == 0] = 0
 
-        # Mask out Optic Disc (with safety margin for peripapillary halo)
         od_x, od_y, od_r = optic_disc
-        cv2.circle(mask, (od_x, od_y), int(od_r * 1.4), 0, -1)
+        od_mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.circle(od_mask, (od_x, od_y), int(od_r * 1.4), 255, -1)
 
-        # Morphological opening to filter noise
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        clean_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        # Exudate candidate thresholding
+        ex_cand = (brightness > 200) & (r > 195) & (g > 190) & (g > b * 1.05) & (inner_mask > 0) & (od_mask == 0)
+        ex_clean = cv2.morphologyEx((ex_cand * 255).astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
+        cnts, _ = cv2.findContours(ex_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        contours, _ = cv2.findContours(clean_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         exudates = []
-        for cnt in contours:
-            area = cv2.contourArea(cnt)
-            if 10 <= area <= 3000:
-                x, y, cw, ch = cv2.boundingRect(cnt)
+        for c in cnts:
+            area = cv2.contourArea(c)
+            if 10 <= area <= 3500:
+                x, y, cw, ch = cv2.boundingRect(c)
                 aspect = cw / max(1, ch)
-                if 0.3 <= aspect <= 3.0:
+                if 0.3 <= aspect <= 3.2:
                     exudates.append({
                         "type": "exudate",
                         "bbox": [round(x / w, 4), round(y / h, 4), round(cw / w, 4), round(ch / h, 4)],
-                        "confidence": round(float(np.clip(0.80 + (area / 8000.0), 0.78, 0.96)), 2)
+                        "confidence": round(float(np.clip(0.82 + (area / 5000.0), 0.80, 0.96)), 2)
                     })
         return exudates
 
     def detect_hemorrhages_and_microaneurysms(
-        self, 
-        rgb_image: np.ndarray, 
-        vessel_mask: np.ndarray, 
+        self,
+        rgb_image: np.ndarray,
+        vessel_mask: np.ndarray,
+        optic_disc: Tuple[int, int, int],
         inner_mask: np.ndarray,
-        optic_disc: Tuple[int, int, int]
+        is_likely_normal: bool = False
     ) -> List[Dict[str, Any]]:
         """
         Detects dark focal lesions (dot/blot hemorrhages and punctate microaneurysms)
-        isolated from retinal blood vessels.
+        using morphological Black Top-Hat transforms on the green channel.
+        Applies anatomical spatial masking (OD, fovea, dilated vessel tree).
         """
         h, w, _ = rgb_image.shape
-        r = rgb_image[:, :, 0].astype(np.float32)
-        g = rgb_image[:, :, 1].astype(np.float32)
-        b = rgb_image[:, :, 2].astype(np.float32)
-        
-        brightness = (r + g + b) / 3.0
-
-        # In Ben Graham images, background is ~110. Hemorrhages & Microaneurysms are dark focal spots < 65
-        dark_candidates = (brightness < 65) & (g < 65) & (r < 75)
-        mask = (dark_candidates * 255).astype(np.uint8)
-        
-        # Dilate vessel mask slightly to avoid vessel edge false positives
-        vessel_dilated = cv2.dilate(vessel_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (4, 4)))
-        mask[vessel_dilated > 0] = 0
-        mask[inner_mask == 0] = 0
-
-        # Mask out optic disc
         od_x, od_y, od_r = optic_disc
-        cv2.circle(mask, (od_x, od_y), int(od_r * 1.3), 0, -1)
+        g_u8 = rgb_image[:, :, 1]
 
-        # Clean noise
-        clean_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
-        contours, _ = cv2.findContours(clean_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
+        # 1. Anatomical exclusion masks
+        od_mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.circle(od_mask, (od_x, od_y), int(od_r * 1.5), 255, -1)
+
+        fovea_dx = -1 if od_x > w / 2 else 1
+        fovea_x = int(np.clip(od_x + fovea_dx * int(od_r * 3.8), 0.18 * w, 0.82 * w))
+        fovea_mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.circle(fovea_mask, (fovea_x, od_y), int(od_r * 1.2), 255, -1)
+
+        vessel_dil = cv2.dilate(vessel_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+
+        safe_dark = cv2.bitwise_and(inner_mask, cv2.bitwise_not(od_mask))
+        safe_dark = cv2.bitwise_and(safe_dark, cv2.bitwise_not(fovea_mask))
+        safe_dark = cv2.bitwise_and(safe_dark, cv2.bitwise_not(vessel_dil))
+
         lesions = []
-        for cnt in contours:
-            area = cv2.contourArea(cnt)
-            if 4 <= area <= 45:
-                x, y, cw, ch = cv2.boundingRect(cnt)
+
+        # 2. MICROANEURYSMS (focal punctate dark lesions, 11x11 kernel)
+        ma_thresh = 42 if is_likely_normal else 28
+        peak_thresh = 48 if is_likely_normal else 34
+        k_ma = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+        bth_ma = cv2.morphologyEx(g_u8, cv2.MORPH_CLOSE, k_ma) - g_u8
+        ma_cand = (bth_ma >= ma_thresh) & (g_u8 < 118) & (safe_dark > 0)
+        ma_clean = cv2.morphologyEx((ma_cand * 255).astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)))
+        cnts_ma, _ = cv2.findContours(ma_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for c in cnts_ma:
+            area = cv2.contourArea(c)
+            if 5 <= area <= 50:
+                x, y, cw, ch = cv2.boundingRect(c)
                 aspect = cw / max(1, ch)
-                if 0.4 <= aspect <= 2.5:
+                if 0.5 <= aspect <= 2.0:
+                    peak_bth = int(np.max(bth_ma[y:y+ch, x:x+cw]))
+                    if peak_bth >= peak_thresh:
+                        lesions.append({
+                            "type": "microaneurysm",
+                            "bbox": [round(x / w, 4), round(y / h, 4), round(cw / w, 4), round(ch / h, 4)],
+                            "confidence": round(float(np.clip(0.80 + (area / 150.0), 0.78, 0.94)), 2)
+                        })
+
+        # 3. HEMORRHAGES (larger dark flame/blot lesions, 21x21 kernel)
+        hem_thresh = 36 if is_likely_normal else 26
+        k_hem = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+        bth_hem = cv2.morphologyEx(g_u8, cv2.MORPH_CLOSE, k_hem) - g_u8
+        hem_cand = (bth_hem >= hem_thresh) & (g_u8 < 114) & (safe_dark > 0)
+        hem_clean = cv2.morphologyEx((hem_cand * 255).astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
+        cnts_hem, _ = cv2.findContours(hem_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for c in cnts_hem:
+            area = cv2.contourArea(c)
+            if 45 < area <= 3500:
+                x, y, cw, ch = cv2.boundingRect(c)
+                aspect = cw / max(1, ch)
+                if 0.25 <= aspect <= 4.0:
                     lesions.append({
-                        "type": "microaneurysm",
+                        "type": "hemorrhage",
                         "bbox": [round(x / w, 4), round(y / h, 4), round(cw / w, 4), round(ch / h, 4)],
-                        "confidence": round(float(np.clip(0.76 + (area / 150.0), 0.72, 0.94)), 2)
+                        "confidence": round(float(np.clip(0.84 + (area / 4500.0), 0.82, 0.98)), 2)
                     })
-            elif 45 < area <= 3000:
-                x, y, cw, ch = cv2.boundingRect(cnt)
-                lesions.append({
-                    "type": "hemorrhage",
-                    "bbox": [round(x / w, 4), round(y / h, 4), round(cw / w, 4), round(ch / h, 4)],
-                    "confidence": round(float(np.clip(0.82 + (area / 4000.0), 0.80, 0.98)), 2)
-                })
+
         return lesions
 
     def detect_neovascularization(
@@ -126,69 +147,81 @@ class LesionSegmentation:
         rgb_image: np.ndarray,
         vessel_mask: np.ndarray,
         optic_disc: Tuple[int, int, int],
-        inner_mask: np.ndarray
+        inner_mask: np.ndarray,
+        is_pdr: bool = False
     ) -> List[Dict[str, Any]]:
         """
-        Detects Neovascularization (NVD / NVE): fragile, disorganized, abnormal new 
+        Detects Neovascularization (NVD / NVE): fine, disorganized, abnormal new
         capillary proliferation on or near the Optic Disc (NVD) or along the vascular arcade (NVE).
-        Characteristics: fine, tangled, high tortuosity, looping vessel network distinct from normal tree.
+        Distinguishes abnormal fine fronds from main vessel trunks.
         """
+        if not is_pdr:
+            return []
+
         h, w, _ = rgb_image.shape
         od_x, od_y, od_r = optic_disc
-        
-        # Peripapillary region of interest (within 2.2 disc diameters from OD center)
-        roi_mask = np.zeros((h, w), dtype=np.uint8)
-        cv2.circle(roi_mask, (od_x, od_y), int(od_r * 2.2), 255, -1)
-        # Exclude internal physiological optic cup where main central vessels emerge
-        cv2.circle(roi_mask, (od_x, od_y), int(od_r * 0.9), 0, -1)
-        roi_mask[inner_mask == 0] = 0
-        
-        # Green channel fine-structure extraction
-        g_channel = rgb_image[:, :, 1]
-        
-        # Small scale top-hat to isolate very fine delicate capillary loops (<5px)
-        kernel_fine = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        tophat_fine = cv2.morphologyEx(cv2.bitwise_not(g_channel), cv2.MORPH_TOPHAT, kernel_fine)
-        
-        # Threshold fine vascular structures in ROI
-        _, fine_thresh = cv2.threshold(tophat_fine, 28, 255, cv2.THRESH_BINARY)
-        fine_in_roi = cv2.bitwise_and(fine_thresh, fine_thresh, mask=roi_mask)
-        
-        # Dilate normal vessel mask so normal vessel edges are completely suppressed
-        kernel_vessel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        vessel_dilated = cv2.dilate(vessel_mask, kernel_vessel)
-        nv_candidates = cv2.bitwise_and(fine_in_roi, cv2.bitwise_not(vessel_dilated))
-        
-        # Find contours of abnormal fine clusters
-        contours, _ = cv2.findContours(nv_candidates, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
+
+        peri_donut = np.zeros((h, w), dtype=np.uint8)
+        cv2.circle(peri_donut, (od_x, od_y), int(od_r * 2.8), 255, -1)
+        cv2.circle(peri_donut, (od_x, od_y), int(od_r * 0.4), 0, -1)
+        peri_donut = cv2.bitwise_and(peri_donut, inner_mask)
+
+        # Isolate main thick vessel trunks (caliber >= 4px)
+        k_trunk = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        trunks = cv2.morphologyEx(vessel_mask, cv2.MORPH_OPEN, k_trunk)
+        trunks_dil = cv2.dilate(trunks, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (4, 4)))
+        fine_prolif = cv2.subtract(vessel_mask, trunks_dil)
+
+        fine_in_roi = cv2.bitwise_and(fine_prolif, fine_prolif, mask=peri_donut)
+        cnts_nv, _ = cv2.findContours(fine_in_roi, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
         neovasc_lesions = []
-        for cnt in contours:
-            area = cv2.contourArea(cnt)
-            # Neovascular fronds typically span 60 to 1500 px in fine irregular networks
-            if 60 <= area <= 1500:
-                perimeter = cv2.arcLength(cnt, True)
-                if perimeter > 0:
-                    circularity = 4 * np.pi * (area / (perimeter * perimeter))
-                    # Tangled fronds have low circularity (<0.25) and high branching tortuosity
-                    if circularity < 0.25:
-                        x, y, cw, ch = cv2.boundingRect(cnt)
-                        neovasc_lesions.append({
-                            "type": "neovascularization",
-                            "bbox": [round(x / w, 4), round(y / h, 4), round(cw / w, 4), round(ch / h, 4)],
-                            "confidence": round(float(np.clip(0.85 + (area / 2000.0), 0.82, 0.96)), 2)
-                        })
+        for c in cnts_nv:
+            area = cv2.contourArea(c)
+            if 30 <= area <= 800:
+                x, y, cw, ch = cv2.boundingRect(c)
+                aspect = cw / max(1, ch)
+                if 0.3 <= aspect <= 3.2:
+                    neovasc_lesions.append({
+                        "type": "neovascularization",
+                        "bbox": [round(x / w, 4), round(y / h, 4), round(cw / w, 4), round(ch / h, 4)],
+                        "confidence": round(float(np.clip(0.86 + (area / 2000.0), 0.84, 0.97)), 2)
+                    })
         return neovasc_lesions
 
-    def extract_all_lesions(self, rgb_image: np.ndarray, vessel_mask: np.ndarray, optic_disc: Tuple[int, int, int]) -> List[Dict[str, Any]]:
-        """Extracts all validated pathological retinal lesions including neovascularization."""
-        inner_mask = self._get_inner_retinal_mask(rgb_image, margin_ratio=0.05)
-        
+    def extract_all_lesions(
+        self,
+        rgb_image: np.ndarray,
+        vessel_mask: np.ndarray,
+        optic_disc: Tuple[int, int, int],
+        dl_probs: Optional[np.ndarray] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Extracts all validated pathological retinal lesions including microaneurysms,
+        hemorrhages, exudates, and neovascularization fronds.
+        """
+        if dl_probs is None:
+            try:
+                from ml.grading.grading_model import dr_grader
+                dl_probs = dr_grader.get_dl_probabilities(rgb_image)
+            except Exception:
+                dl_probs = None
+
+        is_likely_normal = bool(dl_probs is not None and dl_probs[0] >= 0.55 and np.sum(dl_probs[2:]) < 0.15)
+        is_pdr = bool(dl_probs is not None and dl_probs[4] >= 0.15)
+
+        inner_mask = self._get_inner_retinal_mask(rgb_image, safe_ratio=0.38)
+
         exudates = self.detect_exudates(rgb_image, optic_disc, inner_mask)
-        hems_and_mas = self.detect_hemorrhages_and_microaneurysms(rgb_image, vessel_mask, inner_mask, optic_disc)
-        neovasc = self.detect_neovascularization(rgb_image, vessel_mask, optic_disc, inner_mask)
-        
+        hems_and_mas = self.detect_hemorrhages_and_microaneurysms(
+            rgb_image, vessel_mask, optic_disc, inner_mask, is_likely_normal=is_likely_normal
+        )
+        neovasc = self.detect_neovascularization(
+            rgb_image, vessel_mask, optic_disc, inner_mask, is_pdr=is_pdr
+        )
+
         return exudates + hems_and_mas + neovasc
 
 
-lesion_segmentor = LesionSegmentation()
+lesion_segmentor = UnifiedLesionSegmentor()
+LesionSegmentation = UnifiedLesionSegmentor

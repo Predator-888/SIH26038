@@ -43,12 +43,15 @@ class PipelineService:
             cv2.imwrite(proc_img_path, cv2.cvtColor(ben_graham_rgb, cv2.COLOR_RGB2BGR))
             case.processed_image_path = proc_img_path
 
-            # 2. Retinal Structure Segmentation
+            # 2. Deep Learning Prior & Retinal Structure Segmentation
+            dl_probs = dr_grader.get_dl_probabilities(ben_graham_rgb)
             vessel_mask = vessel_segmentor.segment_vessels(ben_graham_rgb)
             optic_disc = vessel_segmentor.locate_optic_disc(ben_graham_rgb)
 
-            # 3. Lesion Extraction (Exudates, Hemorrhages, Microaneurysms)
-            detected_lesions = lesion_segmentor.extract_all_lesions(ben_graham_rgb, vessel_mask, optic_disc)
+            # 3. Lesion Extraction (Exudates, Hemorrhages, Microaneurysms, Neovascularization)
+            detected_lesions = lesion_segmentor.extract_all_lesions(
+                ben_graham_rgb, vessel_mask, optic_disc, dl_probs=dl_probs
+            )
 
             # Remove prior lesions if any
             existing_lesions = session.exec(select(Lesion).where(Lesion.case_id == case_id)).all()
@@ -65,8 +68,10 @@ class PipelineService:
                 )
                 session.add(lesion_obj)
 
-            # 4. 5-Class Severity Grading & Calibration
-            grading_output = dr_grader.predict(ben_graham_rgb, detected_lesions=detected_lesions)
+            # 4. 5-Class Severity Grading & Multi-Modal Calibration
+            grading_output = dr_grader.predict(
+                ben_graham_rgb, detected_lesions=detected_lesions, dl_probs=dl_probs
+            )
 
             # 5. Explainability (Grad-CAM Heatmap Overlay)
             gradcam_rel_path = os.path.join("cases", case_id, "gradcam.png")

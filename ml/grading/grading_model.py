@@ -60,6 +60,37 @@ class DRGradingModel:
                     break
         return None
 
+    def get_dl_probabilities(self, processed_image: np.ndarray) -> Optional[np.ndarray]:
+        """
+        Runs calibrated Deep Learning forward pass to obtain 5-class softmax probabilities.
+        """
+        dl_model = self._get_dl_model()
+        if dl_model is None:
+            return None
+        try:
+            import torch
+            import torchvision.transforms as T
+            from PIL import Image
+            if isinstance(processed_image, np.ndarray):
+                pil_img = Image.fromarray(processed_image)
+            else:
+                pil_img = processed_image
+
+            transform = T.Compose([
+                T.Resize((512, 512)),
+                T.ToTensor(),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+            tensor = transform(pil_img).unsqueeze(0)
+            with torch.no_grad():
+                logits = dl_model(tensor)
+                calibrated_logits = logits / self.temperature
+                dl_probs = torch.softmax(calibrated_logits, dim=1)[0].numpy()
+            return dl_probs
+        except Exception as e:
+            print(f"[*] get_dl_probabilities error: {e}")
+            return None
+
     def predict_from_findings(self, lesions: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Computes calibrated 5-class ICDR severity grade based on segmented pathological findings.
@@ -135,47 +166,34 @@ class DRGradingModel:
             "confidence_band": confidence_band
         }
 
-    def predict(self, processed_image: np.ndarray, detected_lesions: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    def predict(
+        self, 
+        processed_image: np.ndarray, 
+        detected_lesions: Optional[List[Dict[str, Any]]] = None,
+        dl_probs: Optional[np.ndarray] = None
+    ) -> Dict[str, Any]:
         """
         Evaluates retinal image through calibrated multi-modal fusion of deep learning
         and clinical lesion segmentation findings.
         """
+        if dl_probs is None:
+            dl_probs = self.get_dl_probabilities(processed_image)
+
         if detected_lesions is None:
             try:
                 from ml.segmentation.unet_vessels import vessel_segmentor
                 from ml.segmentation.unet_lesions import lesion_segmentor
                 vessel_mask = vessel_segmentor.segment_vessels(processed_image)
                 optic_disc = vessel_segmentor.locate_optic_disc(processed_image)
-                detected_lesions = lesion_segmentor.extract_all_lesions(processed_image, vessel_mask, optic_disc)
+                detected_lesions = lesion_segmentor.extract_all_lesions(processed_image, vessel_mask, optic_disc, dl_probs=dl_probs)
             except Exception:
                 detected_lesions = []
 
         clinical_res = self.predict_from_findings(detected_lesions)
 
-        # Attempt Deep Learning Model Inference
-        dl_model = self._get_dl_model()
-        if dl_model is not None:
+        # Multi-modal fusion with Deep Learning Model
+        if dl_probs is not None:
             try:
-                import torch
-                import torchvision.transforms as T
-                from PIL import Image
-
-                if isinstance(processed_image, np.ndarray):
-                    pil_img = Image.fromarray(processed_image)
-                else:
-                    pil_img = processed_image
-
-                transform = T.Compose([
-                    T.Resize((512, 512)),
-                    T.ToTensor(),
-                    T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-                ])
-                tensor = transform(pil_img).unsqueeze(0)
-                
-                with torch.no_grad():
-                    logits = dl_model(tensor)
-                    calibrated_logits = logits / self.temperature
-                    dl_probs = torch.softmax(calibrated_logits, dim=1)[0].numpy()
 
                 findings_counts = {}
                 if detected_lesions:
