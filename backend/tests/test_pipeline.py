@@ -155,3 +155,28 @@ def test_simulink_and_matlab_files_present():
     assert os.path.exists(os.path.join(repo_root, "matlab", "dr_grading_inference.m"))
     assert os.path.exists(os.path.join(repo_root, "matlab", "triage_and_statistics.m"))
 
+
+def test_gemini_validation_and_report_integration():
+    """Verify Gemini 2.5 Flash findings validation and report generation."""
+    from backend.app.database import engine
+    from backend.app.services.gemini_service import gemini_service
+    from backend.app.services.report_service import report_service
+    from sqlmodel import select
+
+    with Session(engine) as session:
+        first_case = session.exec(select(Case)).first()
+        assert first_case is not None, "At least one case required in database"
+        
+        # 1. Test validation service
+        val = gemini_service.validate_and_explain_case(first_case.case_id, session, lang="en")
+        assert val is not None
+        assert val.status in ["CONCORDANT", "CONCORDANT_WITH_CAUTION", "REVIEW_REQUIRED"]
+        assert len(val.clinical_explanation) > 100
+        assert "Diagnostic Rationale" in val.clinical_explanation
+
+        # 2. Test full HTML report generation includes Gemini section
+        report_html = report_service.generate_html_report(first_case.case_id, session, lang="en")
+        assert "Detailed Clinical Findings Explanation & Validation" in report_html
+        assert "Gemini" in report_html
+        assert "Clinical Protocol" in report_html
+

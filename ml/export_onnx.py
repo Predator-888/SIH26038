@@ -81,7 +81,8 @@ def export_pytorch_to_onnx(checkpoint_path: str = DEFAULT_CHECKPOINT) -> bool:
                 dynamic_axes={
                     "fundus_image": {0: "batch_size"},
                     "dr_grade_logits": {0: "batch_size"}
-                }
+                },
+                dynamo=False
             )
             print(f"[+] Successfully exported: {out_path}")
         except Exception as e:

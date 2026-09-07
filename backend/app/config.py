@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     MATLAB_ENGINE_ENABLED: bool = False
     SIMULINK_MODEL_PATH: str = "./simulink/screening_workflow.slx"
 
+    # Gemini LLM Validation
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -9,6 +9,7 @@ from datetime import datetime
 from sqlmodel import Session, select
 from backend.app.models.case import Case, ImageQualityResult
 from backend.app.models.grading import GradingResult, Lesion
+from backend.app.services.gemini_service import gemini_service
 
 
 class ReportService:
@@ -75,6 +76,27 @@ class ReportService:
             </tr>
             """
 
+        # Gemini 2.5 Findings Validation & Detailed Explanation
+        gemini_val = gemini_service.validate_and_explain_case(case_id, session, lang=lang)
+        gemini_html = gemini_service._format_markdown_to_html(gemini_val.clinical_explanation)
+
+        if gemini_val.status == "CONCORDANT":
+            gemini_status_color = "#059669"
+            gemini_status_bg = "#ECFDF5"
+            gemini_status_label = "Concordant with ICDR Protocol"
+        elif gemini_val.status == "CONCORDANT_WITH_CAUTION":
+            gemini_status_color = "#D97706"
+            gemini_status_bg = "#FFFBEB"
+            gemini_status_label = "Concordant · Elevated Macular Risk"
+        else:
+            gemini_status_color = "#E11D48"
+            gemini_status_bg = "#FFF1F2"
+            gemini_status_label = "Specialist Review Imperative"
+
+        gemini_date_str = gemini_val.created_at.strftime("%d %b %Y, %H:%M UTC")
+        gemini_rec = gemini_val.clinical_recommendation or "Specialist evaluation as detailed in clinical roadmap below."
+        gemini_macular = gemini_val.macular_edema_risk or "Standard Evaluation"
+
         html_content = f"""
         <!DOCTYPE html>
         <html lang="{lang}">
@@ -82,10 +104,11 @@ class ReportService:
             <meta charset="UTF-8">
             <title>Diagnostic Retinal Report — {patient_ref}</title>
             <style>
-                @page {{ size: A4; margin: 15mm; }}
+                @page {{ size: A4; margin: 12mm; }}
                 @media print {{
                     body {{ padding: 0 !important; }}
                     .no-print {{ display: none !important; }}
+                    .print-avoid-break {{ break-inside: avoid; page-break-inside: avoid; }}
                 }}
                 body {{
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -126,6 +149,7 @@ class ReportService:
                     border: 1px solid #E2E8F0;
                     border-radius: 8px;
                     padding: 10px 14px;
+                    break-inside: avoid;
                 }}
                 .card-label {{
                     font-size: 10px;
@@ -149,12 +173,14 @@ class ReportService:
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
+                    break-inside: avoid;
                 }}
                 .images-row {{
                     display: grid;
                     grid-template-columns: 1fr 1fr;
                     gap: 20px;
                     margin-bottom: 18px;
+                    break-inside: avoid;
                 }}
                 .img-container {{
                     text-align: center;
@@ -179,6 +205,7 @@ class ReportService:
                     border-radius: 8px;
                     overflow: hidden;
                     margin-bottom: 18px;
+                    break-inside: avoid;
                 }}
                 th {{
                     background: #F1F5F9;
@@ -197,6 +224,7 @@ class ReportService:
                     justify-content: space-between;
                     font-size: 10px;
                     color: #64748B;
+                    break-inside: avoid;
                 }}
                 .signature-box {{
                     border-top: 1px dashed #94A3B8;
@@ -297,10 +325,48 @@ class ReportService:
                 </tbody>
             </table>
 
+            <!-- Detailed Clinical Explanation & AI Second-Opinion Validation -->
+            <div style="margin-top: 22px; margin-bottom: 24px; border: 1.5px solid #0D9488; border-radius: 10px; background: #F0FDFA; padding: 18px 20px; box-shadow: 0 4px 6px -1px rgba(13, 148, 136, 0.08);">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #CCFBF1; padding-bottom: 10px; margin-bottom: 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 20px;">✨</span>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 800; color: #0F766E; text-transform: uppercase; letter-spacing: 0.5px;">
+                                Detailed Clinical Findings Explanation & Validation
+                            </div>
+                            <div style="font-size: 10.5px; color: #115E59; margin-top: 1px;">
+                                AI Second-Opinion Synthesis · Multimodal Retinal Reasoning · {gemini_val.model_name}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="display: inline-block; padding: 4px 10px; background: {gemini_status_bg}; color: {gemini_status_color}; border: 1px solid {gemini_status_color}; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase;">
+                            {gemini_status_label}
+                        </span>
+                        <div style="font-size: 9.5px; color: #64748B; margin-top: 2px;">
+                            Verified: {gemini_date_str}
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: #FFFFFF; border-left: 4px solid #0D9488; border-radius: 4px; padding: 8px 12px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; font-size: 11.5px;">
+                    <div>
+                        <strong style="color: #0F766E;">Clinical Protocol:</strong> <span style="color: #0F172A;">{gemini_rec}</span>
+                    </div>
+                    <div style="font-weight: 700; color: {'#E11D48' if 'High' in gemini_macular else '#0D9488'}; white-space: nowrap; margin-left: 12px;">
+                        Macular Risk: {gemini_macular}
+                    </div>
+                </div>
+
+                <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px 18px; line-height: 1.55; color: #1E293B;">
+                    {gemini_html}
+                </div>
+            </div>
+
             <div class="footer">
                 <div>
                     <div><strong>Compliance:</strong> DPDP Act 2023 Compliant · De-identified Health Record</div>
-                    <div><strong>Validated Pipeline:</strong> Ben Graham Preprocessing · U-Net Segmentation · EfficientNet-B3 Grad-CAM</div>
+                    <div><strong>Validated Pipeline:</strong> Ben Graham Preprocessing · U-Net Segmentation · EfficientNet-B3 Grad-CAM · Google Gemini 2.5 Validation</div>
                 </div>
                 <div class="signature-box">
                     <div>Reviewing Ophthalmologist</div>
@@ -311,6 +377,7 @@ class ReportService:
         </html>
         """
         return html_content
+
 
 
 report_service = ReportService()

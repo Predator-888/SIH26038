@@ -4,6 +4,7 @@ Database connection and session initialization using SQLModel / SQLite.
 
 from sqlmodel import SQLModel, create_engine, Session
 from backend.app.config import settings
+import backend.app.models  # Ensure all models are registered with SQLModel.metadata
 
 # SQLite connection args
 connect_args = {"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}
