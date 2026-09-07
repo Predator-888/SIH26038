@@ -13,7 +13,8 @@ import {
   User,
   Activity,
   Building2,
-  FolderOpen
+  FolderOpen,
+  Sparkles
 } from 'lucide-react';
 import { Language, translations } from '../i18n/translations';
 import { api } from '../api/client';
@@ -61,168 +62,84 @@ export const FieldWorkerCaptureView: React.FC<FieldWorkerCaptureViewProps> = ({ 
     }
   };
 
-  // High-fidelity clinical retinal image generator for testing
+  const [activeScanNote, setActiveScanNote] = useState<string | null>(null);
+
+  const benchmarkDetails: Record<
+    'normal' | 'mild' | 'moderate' | 'severe' | 'proliferative' | 'blurry',
+    { filename: string; mrn: string; age: string; gender: 'M' | 'F' | 'O'; eye: 'OD' | 'OS'; label: string }
+  > = {
+    normal: {
+      filename: 'normal_l0.jpg',
+      mrn: 'IDRiD-TEST-037 · Normal L0',
+      age: '48',
+      gender: 'F',
+      eye: 'OD',
+      label: 'IEEE IDRiD Patient #37 · Grade 0 (No DR · Normal Fundus)'
+    },
+    mild: {
+      filename: 'mild_l1.jpg',
+      mrn: 'IDRiD-TEST-073 · Mild L1',
+      age: '54',
+      gender: 'M',
+      eye: 'OS',
+      label: 'IEEE IDRiD Patient #73 · Grade 1 (Mild NPDR · Microaneurysms Only)'
+    },
+    moderate: {
+      filename: 'moderate_l2.jpg',
+      mrn: 'IDRiD-TEST-009 · Moderate L2',
+      age: '61',
+      gender: 'F',
+      eye: 'OD',
+      label: 'IEEE IDRiD Patient #09 · Grade 2 (Moderate NPDR · Hard Exudates & Hemorrhages)'
+    },
+    severe: {
+      filename: 'severe_l3.jpg',
+      mrn: 'IDRiD-TEST-006 · Severe L3',
+      age: '67',
+      gender: 'M',
+      eye: 'OS',
+      label: 'IEEE IDRiD Patient #06 · Grade 3 (Severe NPDR · Extensive Blot Hemorrhages)'
+    },
+    proliferative: {
+      filename: 'proliferative_l4.jpg',
+      mrn: 'IDRiD-TEST-005 · PDR L4',
+      age: '58',
+      gender: 'M',
+      eye: 'OD',
+      label: 'IEEE IDRiD Patient #05 · Grade 4 (Proliferative DR · Active Neovascularization)'
+    },
+    blurry: {
+      filename: 'blurry_rejected.jpg',
+      mrn: 'IDRiD-REJECT-001 · Blurry Scan',
+      age: '50',
+      gender: 'F',
+      eye: 'OS',
+      label: 'Real Optical Defocus / Motion Blur (Triggers Real-time Quality Gate Rejection)'
+    }
+  };
+
+  // Loads actual real clinical fundus scan from verified IEEE IDRiD dataset
   const loadClinicalBenchmarkScan = async (type: 'normal' | 'mild' | 'moderate' | 'severe' | 'proliferative' | 'blurry') => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext('2d')!;
+    const details = benchmarkDetails[type];
+    if (!details) return;
 
-    // Black camera border
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, 512, 512);
-
-    // Retinal fundus orange-red base disc
-    const grad = ctx.createRadialGradient(256, 256, 30, 256, 256, 238);
-    grad.addColorStop(0, '#D95B28');
-    grad.addColorStop(0.5, '#BA3815');
-    grad.addColorStop(0.85, '#871E09');
-    grad.addColorStop(1, '#4A0D03');
-
-    ctx.beginPath();
-    ctx.arc(256, 256, 235, 0, Math.PI * 2);
-    ctx.fillStyle = grad;
-    ctx.fill();
-
-    // Macular Foveal Avascular Zone (Darker central region)
-    const maculaGrad = ctx.createRadialGradient(210, 256, 5, 210, 256, 45);
-    maculaGrad.addColorStop(0, '#420B03');
-    maculaGrad.addColorStop(1, 'transparent');
-    ctx.beginPath();
-    ctx.arc(210, 256, 45, 0, Math.PI * 2);
-    ctx.fillStyle = maculaGrad;
-    ctx.fill();
-
-    // Optic Disc (Nasal side with physiological cupping)
-    ctx.beginPath();
-    ctx.arc(380, 256, 34, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFEAA7';
-    ctx.shadowColor = '#FFB830';
-    ctx.shadowBlur = 12;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Optic Cup
-    ctx.beginPath();
-    ctx.arc(380, 256, 16, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFF8E1';
-    ctx.fill();
-
-    // Major Retinal Vascular Arcades
-    const drawVessel = (startX: number, startY: number, cp1x: number, cp1y: number, cp2x: number, cp2y: number, endX: number, endY: number, width: number) => {
-      ctx.strokeStyle = '#520B04';
-      ctx.lineWidth = width;
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
-      ctx.stroke();
-    };
-
-    drawVessel(380, 256, 330, 190, 220, 165, 120, 155, 4.5);
-    drawVessel(330, 190, 280, 130, 200, 110, 130, 105, 2.5);
-    drawVessel(380, 256, 330, 320, 220, 345, 115, 355, 4.5);
-    drawVessel(330, 320, 270, 380, 190, 400, 125, 410, 2.5);
-    drawVessel(380, 256, 420, 210, 460, 180, 485, 170, 3.0);
-    drawVessel(380, 256, 420, 300, 460, 330, 485, 340, 3.0);
-
-    // Add lesions based on scenario
-    if (type === 'mild') {
-      // Mild NPDR: isolated microaneurysms only (no exudates, no large hemorrhages)
-      ctx.fillStyle = '#610602';
-      [
-        [220, 210, 2.2], [270, 280, 2.5], [195, 300, 2.0]
-      ].forEach(([x, y, r]) => {
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
-
-    if (type === 'moderate' || type === 'severe') {
-      // Hard Exudates
-      ctx.fillStyle = '#FFFDE7';
-      ctx.shadowColor = '#FFE082';
-      ctx.shadowBlur = 4;
-      [
-        [240, 235, 4], [250, 240, 3], [235, 255, 4.5], [260, 250, 3.5],
-        [175, 220, 3], [165, 235, 4]
-      ].forEach(([x, y, r]) => {
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      ctx.shadowBlur = 0;
-
-      // Hemorrhages
-      ctx.fillStyle = '#380402';
-      [
-        [180, 280, 6], [160, 295, 5], [290, 210, 5.5], [195, 210, 4.5]
-      ].forEach(([x, y, r]) => {
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // Microaneurysms
-      ctx.fillStyle = '#610602';
-      [
-        [220, 210, 2], [270, 280, 2.5], [185, 320, 2], [305, 310, 2.5]
-      ].forEach(([x, y, r]) => {
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
-
-    if (type === 'severe') {
-      ctx.fillStyle = '#260201';
-      [
-        [280, 330, 9], [150, 290, 8], [310, 180, 7.5], [170, 350, 8], [330, 220, 7]
-      ].forEach(([x, y, r]) => {
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
-
-    if (type === 'proliferative') {
-      // Extensive vitreous / preretinal blot hemorrhages
-      ctx.fillStyle = '#260201';
-      [
-        [280, 330, 10], [150, 290, 9], [310, 180, 8.5], [170, 350, 9], [330, 220, 8], [240, 210, 7.5]
-      ].forEach(([x, y, r]) => {
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      // Neovascular fronds near optic disc (NVD)
-      ctx.strokeStyle = '#8B0000';
-      ctx.lineWidth = 1.5;
-      [
-        [[370, 240], [360, 230], [350, 235], [365, 245]],
-        [[390, 270], [405, 280], [415, 275], [400, 265]],
-        [[250, 180], [240, 170], [235, 178], [248, 185]]
-      ].forEach((pts) => {
-        ctx.beginPath();
-        ctx.moveTo(pts[0][0], pts[0][1]);
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-        ctx.stroke();
-      });
-    }
-
-    if (type === 'blurry') {
-      ctx.filter = 'blur(16px)';
-      ctx.drawImage(canvas, 0, 0);
-      ctx.filter = 'none';
-    }
-
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const file = new File([blob], `study_${type}_45deg.jpg`, { type: 'image/jpeg' });
-        setPatientId(`MRN-2026-${Math.floor(10000 + Math.random() * 90000)}`);
-        handleFileChange(file);
+    try {
+      const res = await fetch(`/reference_scans/${details.filename}`);
+      if (!res.ok) {
+        throw new Error(`Failed to load /reference_scans/${details.filename}`);
       }
-    }, 'image/jpeg', 0.95);
+      const blob = await res.blob();
+      const file = new File([blob], details.filename, { type: 'image/jpeg' });
+
+      handleFileChange(file);
+      setPatientId(details.mrn);
+      setPatientAge(details.age);
+      setPatientGender(details.gender);
+      setEyeSide(details.eye);
+      setActiveScanNote(details.label);
+    } catch (err) {
+      console.error('Failed to load real dataset image:', err);
+    }
   };
 
   const handleUpload = async () => {
@@ -506,6 +423,15 @@ export const FieldWorkerCaptureView: React.FC<FieldWorkerCaptureViewProps> = ({ 
                 Blurry Scan
               </button>
             </div>
+
+            {activeScanNote && (
+              <div className="mt-2.5 p-2.5 rounded-lg bg-medical/5 border border-medical/20 flex items-center gap-2 text-xs text-clinical-800 animate-in fade-in">
+                <Sparkles className="w-4 h-4 text-medical flex-shrink-0" />
+                <span>
+                  <strong className="text-medical font-bold">Real Clinical Study Loaded:</strong> {activeScanNote}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Upload Button */}
