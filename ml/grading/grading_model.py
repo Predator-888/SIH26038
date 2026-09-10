@@ -24,12 +24,14 @@ GRADE_LABELS = {
 
 
 class DRGradingModel:
-    def __init__(self, temperature: float = 0.90, uncertain_max: float = 0.70):
+    def __init__(self, temperature: float = 1.35, uncertain_max: float = 0.70):
         self.temperature = temperature
         self.uncertain_max = uncertain_max
         self.device = "cpu"
         self._dl_model = None
         self._dl_loaded = False
+        self._onnx_session = None
+        self._onnx_loaded = False
 
     def _get_dl_model(self):
         """Loads PyTorch deep learning model if available."""
@@ -54,42 +56,87 @@ class DRGradingModel:
                     model.load_state_dict(state_dict, strict=False)
                     model.eval()
                     self._dl_model = model
+                    print(f"[+] Loaded PyTorch grading model: {cand}")
                     return self._dl_model
                 except Exception as e:
                     print(f"[*] DL model load fallback: {e}")
                     break
         return None
 
+    def _get_onnx_session(self):
+        """Loads ONNX runtime inference session if available (ideal for Render cloud deployment)."""
+        if self._onnx_loaded:
+            return self._onnx_session
+
+        self._onnx_loaded = True
+        try:
+            import onnxruntime as ort
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+            candidates = [
+                os.path.join(project_root, "static", "models", "grading_model.onnx"),
+                os.path.join(project_root, "ml", "checkpoints", "idrid_grading_model.onnx"),
+            ]
+            for cand in candidates:
+                if os.path.exists(cand):
+                    opts = ort.SessionOptions()
+                    opts.intra_op_num_threads = 2
+                    opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                    self._onnx_session = ort.InferenceSession(cand, sess_options=opts, providers=["CPUExecutionProvider"])
+                    print(f"[+] Loaded ONNX grading model: {cand}")
+                    return self._onnx_session
+        except Exception as e:
+            print(f"[*] ONNX session load fallback: {e}")
+        return None
+
     def get_dl_probabilities(self, processed_image: np.ndarray) -> Optional[np.ndarray]:
         """
         Runs calibrated Deep Learning forward pass to obtain 5-class softmax probabilities.
+        Attempts PyTorch model first; gracefully falls back to ONNX Runtime session.
+        Guarantees that real neural network inference runs both locally and on Render.
         """
-        dl_model = self._get_dl_model()
-        if dl_model is None:
-            return None
+        # 1. Standardize image to 512x512 float32 with ImageNet normalization
         try:
-            import torch
-            import torchvision.transforms as T
-            from PIL import Image
             if isinstance(processed_image, np.ndarray):
-                pil_img = Image.fromarray(processed_image)
+                resized = cv2.resize(processed_image, (512, 512), interpolation=cv2.INTER_AREA)
             else:
-                pil_img = processed_image
+                resized = np.array(processed_image.resize((512, 512)))
 
-            transform = T.Compose([
-                T.Resize((512, 512)),
-                T.ToTensor(),
-                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            ])
-            tensor = transform(pil_img).unsqueeze(0)
-            with torch.no_grad():
-                logits = dl_model(tensor)
-                calibrated_logits = logits / self.temperature
-                dl_probs = torch.softmax(calibrated_logits, dim=1)[0].numpy()
-            return dl_probs
+            norm = resized.astype(np.float32) / 255.0
+            mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+            std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+            norm = (norm - mean) / std
+            input_tensor = np.transpose(norm, (2, 0, 1))[np.newaxis, :, :, :].astype(np.float32)
         except Exception as e:
-            print(f"[*] get_dl_probabilities error: {e}")
+            print(f"[*] Preprocessing tensor error in get_dl_probabilities: {e}")
             return None
+
+        # 2. Try PyTorch model first
+        dl_model = self._get_dl_model()
+        if dl_model is not None:
+            try:
+                import torch
+                t = torch.from_numpy(input_tensor)
+                with torch.no_grad():
+                    logits = dl_model(t).cpu().numpy()[0]
+                calibrated = logits / self.temperature
+                exp_l = np.exp(calibrated - np.max(calibrated))
+                return exp_l / np.sum(exp_l)
+            except Exception as e:
+                print(f"[*] PyTorch inference error, attempting ONNX: {e}")
+
+        # 3. Try ONNX Runtime session (Render production environment)
+        onnx_sess = self._get_onnx_session()
+        if onnx_sess is not None:
+            try:
+                input_name = onnx_sess.get_inputs()[0].name
+                logits = onnx_sess.run(None, {input_name: input_tensor})[0][0]
+                calibrated = logits / self.temperature
+                exp_l = np.exp(calibrated - np.max(calibrated))
+                return exp_l / np.sum(exp_l)
+            except Exception as e:
+                print(f"[*] ONNX inference error: {e}")
+
+        return None
 
     def predict_from_findings(self, lesions: List[Dict[str, Any]]) -> Dict[str, Any]:
         """

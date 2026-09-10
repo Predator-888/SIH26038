@@ -99,7 +99,7 @@ class UnifiedLesionSegmentor:
 
         lesions = []
 
-        # 2. MICROANEURYSMS (focal punctate dark lesions, 11x11 kernel)
+        # 2. MICROANEURYSMS (sub-pixel focal punctate dark lesions, 11x11 kernel)
         ma_thresh = 42 if is_likely_normal else 28
         peak_thresh = 48 if is_likely_normal else 34
         k_ma = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
@@ -115,9 +115,23 @@ class UnifiedLesionSegmentor:
                 if 0.5 <= aspect <= 2.0:
                     peak_bth = int(np.max(bth_ma[y:y+ch, x:x+cw]))
                     if peak_bth >= peak_thresh:
+                        # Compute intensity-weighted 2D spatial moments for sub-pixel centroid localization
+                        M = cv2.moments(c)
+                        if M["m00"] != 0:
+                            sub_x = float(M["m10"] / M["m00"])
+                            sub_y = float(M["m01"] / M["m00"])
+                        else:
+                            sub_x = float(x + cw / 2.0)
+                            sub_y = float(y + ch / 2.0)
+
+                        sub_radius = float(np.sqrt(area / np.pi))
+
                         lesions.append({
                             "type": "microaneurysm",
                             "bbox": [round(x / w, 4), round(y / h, 4), round(cw / w, 4), round(ch / h, 4)],
+                            "subpixel_center": [round(sub_x / w, 5), round(sub_y / h, 5)],
+                            "subpixel_radius": round(sub_radius, 2),
+                            "peak_contrast": round(float(peak_bth), 1),
                             "confidence": round(float(np.clip(0.80 + (area / 150.0), 0.78, 0.94)), 2)
                         })
 

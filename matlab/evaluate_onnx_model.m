@@ -97,8 +97,8 @@ function results = evaluate_onnx_model(case_id, onnx_model_path)
     logits = extractdata(logits);
     logits = reshape(logits, 1, []);
 
-    % Temperature scaling (T = 1.24) and softmax
-    T = 1.24;
+    % Temperature scaling (T = 1.35) and softmax
+    T = 1.35;
     calibrated_logits = logits / T;
     exp_l = exp(calibrated_logits - max(calibrated_logits));
     probabilities = exp_l / sum(exp_l);

@@ -32,6 +32,25 @@ class PipelineService:
         session.commit()
 
         try:
+            # 0. Optical Quality Gatekeeper (Reject ungradable scans before inference)
+            from backend.app.models.case import ImageQualityResult
+            from backend.app.services.quality_service import quality_service
+
+            quality_entry = session.exec(select(ImageQualityResult).where(ImageQualityResult.case_id == case_id)).first()
+            if not quality_entry:
+                quality_entry = quality_service.evaluate_case_image(case, session)
+
+            if not quality_entry.passed and case.status != "override_analyzing":
+                case.status = "quality_rejected"
+                session.add(case)
+                session.commit()
+                raise ValueError(
+                    f"Image Quality Gate Rejected: {quality_entry.reject_reasons}. "
+                    f"Actionable Recapture Guidance: Focus={int(quality_entry.focus_score*100)}%, "
+                    f"Illumination={int(quality_entry.illumination_score*100)}%, "
+                    f"FOV={int(quality_entry.fov_score*100)}%. Please retake scan."
+                )
+
             # 1. Preprocessing (Ben Graham + CLAHE)
             ben_graham_rgb, clahe_rgb = preprocess_fundus_pipeline(case.image_path)
             

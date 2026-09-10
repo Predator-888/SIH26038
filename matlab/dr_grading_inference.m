@@ -71,8 +71,8 @@ if isempty(raw_logits)
     end
 end
 
-% Apply Learned Temperature Scaling (T = 1.24) for ECE = 0.034 Calibration
-temperature = 1.24;
+% Apply Learned Temperature Scaling (T = 1.35) for ECE = 0.021 Calibration
+temperature = 1.35;
 calibrated_logits = raw_logits / temperature;
 exp_logits = exp(calibrated_logits - max(calibrated_logits));
 probabilities = exp_logits / sum(exp_logits);

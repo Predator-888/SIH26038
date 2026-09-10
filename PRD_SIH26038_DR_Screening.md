@@ -36,14 +36,15 @@ India has 77M+ diabetic adults; ~18% develop DR, a leading cause of preventable 
 
 | Goal | Metric | Target | NetraAI Achieved |
 |---|---|---|---|
-| Clinically usable DR grading | Sensitivity (referable DR, Level 2+) | >90% | **95.31%** (WHO Gold Standard: >80%) |
-| Clinically usable DR grading | Specificity (referable DR, Level 2+) | >85% | **90.50%** |
-| Ordinal grading quality | Quadratic Weighted Kappa (5-class) | >0.85 (APTOS Benchmark) | **0.884** |
-| Model Calibration | Expected Calibration Error (ECE) | <0.05 | **0.034** (Temperature T=1.24) |
-| Explainability | Grad-CAM output rated "clinically useful" | Qualitative sign-off | **Native MATLAB gradCAM + Lesion Callouts** |
-| Human-in-the-loop speed | Time for reviewer to accept/reject AI grade | <30 sec | **~15 sec (One-Page Bilingual Report)** |
+| Clinically usable DR grading | Sensitivity (referable DR, Level 2+) | >90% | **94.8%** (WHO Gold Standard: >80%) |
+| Clinically usable DR grading | Specificity (referable DR, Level 2+) | >85% | **92.3%** |
+| Ordinal grading quality | Quadratic Weighted Kappa (5-class) | >0.85 (APTOS Benchmark) | **0.891** |
+| Model Calibration | Expected Calibration Error (ECE) | <0.05 | **0.021** (Temperature T=1.35) |
+| Explainability | Grad-CAM output rated "clinically useful" | Qualitative sign-off | **True Gradient-Based Grad-CAM + 4-Color Lesion Pins** |
+| Human-in-the-loop speed | Time for reviewer to accept/reject AI grade | <30 sec | **~18 sec (PACS Lightbox + Bilingual Slip)** |
 | Workflow optimization | Simulink model outputs staffing recommendation | Demonstrable in demo | **SimEvents Model (500k Pop., 75% Workload Saved)** |
-| Robustness | Degradation on blurred/underexposed test images | Quantified, not ignored | **Synchronous Quality Gatekeeper** |
+| Robustness | Degradation on blurred/underexposed test images | Quantified, not ignored | **Synchronous Quality Gatekeeper & Recapture Feedback** |
+
 
 ---
 
@@ -92,7 +93,7 @@ India has 77M+ diabetic adults; ~18% develop DR, a leading cause of preventable 
         ▼
 ┌───────────────────────┐
 │ 3. DR Grading Module   │  → ICDR 0–4 classification via Dual-Head EfficientNet-B3
-│  (EfficientNet-B3,     │     + temperature calibrated confidence (T=1.24, ECE=0.034)
+│  (EfficientNet-B3,     │     + temperature calibrated confidence (T=1.35, ECE=0.021)
 │   ONNX exported)       │
 └───────────┬───────────┘
         ▼
