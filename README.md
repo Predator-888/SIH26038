@@ -31,7 +31,7 @@
 
 ## 🚀 1. Executive Summary & 30-Second Elevator Pitch
 
-> *"In India, over 77 million adults have diabetes, and 1 in 3 will develop Diabetic Retinopathy—a condition where high blood sugar damages retinal micro-vessels, causing irreversible blindness if caught late. Yet, rural India has only 1 ophthalmologist for every 100,000 citizens, so rural patients cannot be screened in time.*
+> *"In India, over 77 million adults have diabetes, and 1 in 3 will develop Diabetic Retinopathy—a condition where high blood sugar damages retinal micro-vessels, causing irreversible blindness if caught late. Yet, India has only 1 ophthalmologist for every 65,000 people (with over 80% concentrated in urban centres), so rural patients cannot be screened in time.*
 >
 > *Our project, **NetraAI (SIH26038)**, is an open, clinically explainable tele-ophthalmology screening platform. An entry-level ASHA health worker at a village clinic captures an eye photo using a low-cost fundus camera. In **under 30 seconds**, NetraAI:*
 > 1. *Validates optical image sharpness and illumination with instant recapture guidance.*
@@ -91,7 +91,7 @@ Ophthalmologists worldwide classify DR on the **International Clinical Diabetic 
 
 ### The Indian Healthcare Dilemma
 - **77+ Million Diabetic Patients:** India has the second largest diabetic population globally.
-- **The Specialist Shortage:** India has only ~25,000 ophthalmologists for 1.4 billion people. In rural Primary Health Centers (PHCs), the ratio drops to **1 eye doctor per 100,000 citizens**.
+- **The Specialist Shortage:** India has only ~22,000 to 25,000 ophthalmologists for 1.4 billion people—a national ratio of **1 ophthalmologist per 65,000 people** (far below the WHO recommended target). Compounding this, over 80% practice in urban tertiary hospitals, leaving rural Primary Health Centers (PHCs) severely underserved.
 - **The Tragedy:** Over 90% of vision loss can be prevented with early detection, but rural patients only seek care once vision is irreversibly damaged.
 
 ---
@@ -392,9 +392,6 @@ A major differentiator of NetraAI is that it models the **real-world healthcare 
 SIH26038/
 ├── README.md                                   ◄── You are here (Complete Master Documentation)
 ├── verify_production_pipeline.py               ◄── Automated 5-stage clinical validation on real IDRiD scans
-├── PRD_SIH26038_DR_Screening.md                ◄── Official Product Requirements Document
-├── MATLAB_INTEGRATION_SPEC_SIH26038.md         ◄── MathWorks Compliance & Integration Spec
-├── SIH26038_COMPLETE_PROJECT_PITCH_AND_TECHNICAL_DOSSIER.md ◄── Full Pitch Dossier & Medical Compendium
 │
 ├── matlab/                                     ◄── NATIVE MATHWORKS PIPELINE SUITE
 │   ├── netraai_master_pipeline.m               ◄── Master orchestrator (All 6 Toolboxes + 6-Panel Figure)

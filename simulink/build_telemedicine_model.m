@@ -1,6 +1,5 @@
 %% =========================================================================
 %% NetraAI (SIH26038): Automated Telemedicine Simulink / SimEvents Model Builder
-%% Conforms to: MATLAB_INTEGRATION_SPEC_SIH26038.md (Phase 3)
 %% Sponsor: MathWorks · Theme: MedTech / BioTech / HealthTech
 %% =========================================================================
 % Builds the 'telemedicine_district_model.slx' SimEvents discrete-event

@@ -1,6 +1,5 @@
 %% =========================================================================
 %% NetraAI (SIH26038): MATLAB Native ONNX Inference & Grad-CAM Evaluation
-%% Conforms to: MATLAB_INTEGRATION_SPEC_SIH26038.md (Phase 2)
 %% MathWorks Toolboxes Required:
 %% - Deep Learning Toolbox (and 'Deep Learning Toolbox Converter for ONNX')
 %% - Image Processing Toolbox

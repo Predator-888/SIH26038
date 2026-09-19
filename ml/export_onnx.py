@@ -1,6 +1,6 @@
 """
 NetraAI (SIH26038): PyTorch to ONNX Model Exporter for MATLAB Deep Learning Toolbox.
-Conforms to: MATLAB_INTEGRATION_SPEC_SIH26038.md (Phase 1)
+Conforms to MathWorks MATLAB R2024b importNetworkFromONNX requirements.
 
 Exports the trained PyTorch EfficientNet-B3 model to ONNX format (1x3x512x512)
 so that it can be imported natively into MATLAB using:
